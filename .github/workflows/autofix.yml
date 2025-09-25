@@ -27,3 +27,8 @@ jobs:
 
       - if: github.ref_name == 'main'
         uses: bckground/actions/setup-mise/save@main
+        with:
+          cache_s3_endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
+          cache_s3_access_key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
+          cache_s3_secret_key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
+          cache_s3_bucket_name: ${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}
