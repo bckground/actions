@@ -1,0 +1,34 @@
+---
+name: "cache-go - save"
+
+inputs:
+  s3_credentials:
+    description: |
+      The S3 credentials as a JSON object. Must contain the following keys:
+
+      - endpoint (no URL scheme)
+      - access_key
+      - secret_key
+      - bucket_name
+    type: "string"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Retrieve go configuration"
+      uses: "bckground/actions/cache-go/internal@main"
+      id: "go-config"
+
+    - name: "Cache go"
+      uses: bckground/actions-cache/save@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+      with:
+        endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
+        accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
+        secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
+        bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
+        use-fallback: false
+        key: go-${{ steps.go-config.outputs.go_version }}-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        path: |
+          ${{ steps.go-config.outputs.mod_cache }}
+          ${{ steps.go-config.outputs.build_cache }}

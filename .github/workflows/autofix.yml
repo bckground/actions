@@ -14,12 +14,9 @@ jobs:
     name: "prettier"
     runs-on: "ubuntu-latest"
     env:
-      S3_CREDENTIALS: ${{ format('{{
-        "endpoint": "{0}",
-        "access_key": "{1}",
-        "secret_key": "{2}",
-        "bucket_name": "{3}"
-      }}', secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
+      S3_CREDENTIALS: >-
+        ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
+        secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
     steps:
       - uses: "actions/checkout@v5"
 
