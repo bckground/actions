@@ -35,6 +35,6 @@ runs:
         secretKey: "${{ inputs.cache_s3_secret_key }}"
         bucket: "${{ inputs.cache_s3_bucket_name }}"
         use-fallback: false
-        key: mise-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        key: "mise-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}"
         path: |
           ${{ steps.mise-cache-dirs.outputs.data_dir }}
