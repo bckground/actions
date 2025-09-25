@@ -1,0 +1,19 @@
+---
+overrides:
+  - files:
+      - "*.yaml"
+      - "*.yml"
+    options:
+      parser: "yaml"
+      printWidth: 1000
+      tabWidth: 2
+      useTabs: false
+      singleQuote: false
+      quoteProps: "preserve"
+  - files:
+      - "*.md"
+      - "*.markdown"
+    options:
+      parser: "markdown"
+      printWidth: 1000
+      useTabs: true
