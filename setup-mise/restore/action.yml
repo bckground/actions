@@ -41,6 +41,19 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: "Set up mise"
+      uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
+      env:
+        MISE_ENV: "${{ inputs.mise_envs }}"
+      with:
+        version: "${{ inputs.mise_version }}"
+        install: false # Do NOT `mise install`.
+        cache: false
+        experimental: true # Enable experimental features.
+        log_level: "debug"
+        working_directory: "${{ inputs.working_directory }}"
+        reshim: true
+
     - name: "Retrieve mise directories to cache"
       uses: "bckground/actions/setup-mise/internal@main"
       id: "mise-cache-dirs"
@@ -59,15 +72,7 @@ runs:
         path: |
           ${{ steps.mise-cache-dirs.outputs.data_dir }}
 
-    - name: "Set up mise"
-      uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
-      env:
-        MISE_ENV: "${{ inputs.mise_envs }}"
-      with:
-        version: "${{ inputs.mise_version }}"
-        install: true # Run `mise install`.
-        cache: false
-        experimental: true # Enable experimental features.
-        log_level: "debug"
-        working_directory: "${{ inputs.working_directory }}"
-        reshim: true
+    - name: "Run `mise install`"
+      shell: "bash"
+      run: |
+        mise install
