@@ -2,6 +2,22 @@
 name: "setup-mise - save"
 
 inputs:
+  mise_envs:
+    description: |
+      A comma-separated list of environments.
+
+      Mise looks for environment-targeted files named like mise.{ENV}.toml
+      alongside the base mise.toml, and merges them with a defined precedence.
+
+      Multiple environments can be specified in order, such as
+      `mise_envs: "ci,test"`, with the last in the list taking precedence
+      during merge.
+    default: ""
+    required: false
+  working_directory:
+    description: "The directory with the root of the project"
+    default: "."
+    required: false
   s3_credentials:
     description: |
       The S3 credentials as a JSON object. Must contain the following keys:
@@ -20,14 +36,64 @@ runs:
       uses: "bckground/actions/setup-mise/internal@main"
       id: "mise-config"
 
-    - name: "Cache mise"
-      uses: bckground/actions-cache/save@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+    - name: "Calculate mise config hash"
+      id: "mise-config-hash"
+      uses: "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" # v8.0.0
+      env:
+        MISE_WORKING_DIRECTORY: "${{ inputs.working_directory }}"
+        MISE_ENV: "${{ inputs.mise_envs }}"
+      with:
+        script: |
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const path = require('path');
+
+          const basePath = process.env.MISE_WORKING_DIRECTORY;
+          const files = [path.join(basePath, 'mise.toml')];
+
+          if (process.env.MISE_ENV) {
+            const envs = process.env.MISE_ENV.split(',');
+            for (const env of envs) {
+              files.push(path.join(basePath, `mise.${env.trim()}.toml`));
+            }
+          }
+
+          console.log('Files being hashed:', files);
+
+          const hash = crypto.createHash('sha256');;
+          for (const file of files) {
+            if (fs.existsSync(file)) {
+              console.log('Hashing file:', file);
+              const content = fs.readFileSync(file);
+              hash.update(content);
+            } else {
+              console.log('File not found:', file);
+            }
+          }
+
+          core.setOutput('hash', hash.digest('hex'));
+
+    - name: "Check if the cache exists"
+      uses: bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+      id: "cache-lookup"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}"
+        lookup-only: true
+        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+
+    - name: "Cache mise"
+      uses: bckground/actions-cache/save@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+      if: "steps.cache-lookup.outputs.cache-hit == 'false'"
+      with:
+        endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
+        accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
+        secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
+        bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
+        use-fallback: false
+        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
