@@ -5,13 +5,13 @@ inputs:
   cache_s3_endpoint:
     type: "string"
     required: true
-  cache_s3_access-key:
+  cache_s3_access_key:
     type: "string"
     required: true
-  cache_s3_secret-key:
+  cache_s3_secret_key:
     type: "string"
     required: true
-  cache_s3_bucket-name:
+  cache_s3_bucket_name:
     type: "string"
     required: true
 
