@@ -23,14 +23,14 @@ runs:
     - name: "Restore go caches"
       uses: "bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8"
       with:
-        endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
-        accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
-        secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
-        bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
+        endpoint: "${{ fromJson(inputs.s3_credentials).endpoint }}"
+        accessKey: "${{ fromJson(inputs.s3_credentials).access_key }}"
+        secretKey: "${{ fromJson(inputs.s3_credentials).secret_key }}"
+        bucket: "${{ fromJson(inputs.s3_credentials).bucket_name }}"
         use-fallback: false
-        key: go-${{ steps.go-config.outputs.go_version }}-on-${{ runner.os }}-${{ runner.arch }}-
+        key: "go-${{ steps.go-config.outputs.go_version }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-"
         restore-keys: |
-          go-${{ steps.go-config.outputs.go_version }}-on-${{ runner.os }}-${{ runner.arch }}-
+          go-${{ steps.go-config.outputs.go_version }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
         path: |
           ${{ steps.go-config.outputs.mod_cache }}
           ${{ steps.go-config.outputs.build_cache }}

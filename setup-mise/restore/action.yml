@@ -47,9 +47,9 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-on-${{ runner.os }}-${{ runner.arch }}-"
+        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-"
         restore-keys: |
-          mise-on-${{ runner.os }}-${{ runner.arch }}-
+          mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
 

@@ -28,6 +28,6 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}"
+        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}"
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
