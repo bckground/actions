@@ -13,24 +13,23 @@ jobs:
   prettier:
     name: "prettier"
     runs-on: "ubuntu-latest"
+    env:
+      S3_CREDENTIALS: ${{ format('{{
+        "endpoint": "{0}",
+        "access_key": "{1}",
+        "secret_key": "{2}",
+        "bucket_name": "{3}"
+      }}', secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
     steps:
       - uses: "actions/checkout@v5"
 
       - uses: "bckground/actions/setup-mise/restore@main"
         with:
-          # For OVH, the endpoint must be: `s3.<region>.io.cloud.ovh.net`
-          # No URL scheme. Ignore the virtual hosted-style endpoint.
-          cache_s3_endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
-          cache_s3_access_key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
-          cache_s3_secret_key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
-          cache_s3_bucket_name: ${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}
+          s3_credentials: "${{ env.S3_CREDENTIALS }}"
 
       - uses: "bckground/actions/autofix-prettier@main"
 
       - if: github.ref_name == 'main'
         uses: bckground/actions/setup-mise/save@main
         with:
-          cache_s3_endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
-          cache_s3_access_key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
-          cache_s3_secret_key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
-          cache_s3_bucket_name: ${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}
+          s3_credentials: "${{ env.S3_CREDENTIALS }}"

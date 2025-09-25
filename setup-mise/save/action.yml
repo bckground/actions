@@ -1,40 +1,33 @@
 ---
-name: "save mise setup"
+name: "setup-mise - save"
 
 inputs:
-  cache_s3_endpoint:
-    type: "string"
-    required: true
-  cache_s3_access_key:
-    type: "string"
-    required: true
-  cache_s3_secret_key:
-    type: "string"
-    required: true
-  cache_s3_bucket_name:
-    type: "string"
-    required: true
+  s3_credentials:
+    description: |
+      The S3 credentials as a JSON object. Must contain the following keys:
 
-outputs:
-  data_dir:
-    description: "The path to mise's data directory"
-    value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
+      - endpoint (no URL scheme)
+      - access_key
+      - secret_key
+      - bucket_name
+    type: "string"
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: "Retrieve mise directories to cache"
+    - name: "Retrieve mise configuration"
       uses: "bckground/actions/setup-mise/internal@main"
-      id: "mise-cache-dirs"
+      id: "mise-config"
 
-    - name: "Save mise directories"
+    - name: "Cache mise"
       uses: bckground/actions-cache/save@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
       with:
-        endpoint: "${{ inputs.cache_s3_endpoint }}"
-        accessKey: "${{ inputs.cache_s3_access_key }}"
-        secretKey: "${{ inputs.cache_s3_secret_key }}"
-        bucket: "${{ inputs.cache_s3_bucket_name }}"
+        endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
+        accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
+        secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
+        bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
         key: "mise-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}"
         path: |
-          ${{ steps.mise-cache-dirs.outputs.data_dir }}
+          ${{ steps.mise-config.outputs.data_dir }}

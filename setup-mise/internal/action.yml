@@ -1,16 +1,16 @@
 ---
-name: "mise - internal"
+name: "setup-mise - internal"
 
 outputs:
   data_dir:
     description: "The path to mise's data directory"
-    value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
+    value: "${{ steps.mise-config.outputs.data_dir }}"
 
 runs:
   using: "composite"
   steps:
-    - name: "Retrieve mise directories to cache"
-      id: "mise-cache-dirs"
+    - name: "Retrieve mise configuration"
+      id: "mise-config"
       shell: "bash"
       run: |
         echo "data_dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
