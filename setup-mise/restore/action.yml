@@ -57,16 +57,15 @@ runs:
         path: |
           ${{ steps.mise-cache-dirs.outputs.data-dir }}
 
-      - name: "Set up mise"
-        uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
-        env:
-          MISE_ENV: "${{ inputs.mise_envs }}"
-        with:
-          version: "latest"
-          install: true # Run `mise install`.
-          cache: false
-          experimental: true # Enable experimental features.
-          log_level: "debug"
-          working_directory: "${{ inputs.working_directory }}"
-          reshim: true
-
+    - name: "Set up mise"
+      uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
+      env:
+        MISE_ENV: "${{ inputs.mise_envs }}"
+      with:
+        version: "latest"
+        install: true # Run `mise install`.
+        cache: false
+        experimental: true # Enable experimental features.
+        log_level: "debug"
+        working_directory: "${{ inputs.working_directory }}"
+        reshim: true
