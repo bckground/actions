@@ -16,7 +16,7 @@ inputs:
     required: true
 
 outputs:
-  data-dir:
+  data_dir:
     description: "The path to mise's data directory"
     value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
 

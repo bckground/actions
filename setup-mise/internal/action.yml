@@ -2,7 +2,7 @@
 name: "mise - internal"
 
 outputs:
-  data-dir:
+  data_dir:
     description: "The path to mise's data directory"
     value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
 
@@ -13,4 +13,4 @@ runs:
       id: "mise-cache-dirs"
       shell: "bash"
       run: |
-        echo "data-dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
+        echo "data_dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
