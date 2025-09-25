@@ -17,10 +17,10 @@ jobs:
 
       - uses: "bckground/actions/setup-mise/restore@main"
         with:
-          cache-s3-endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
-          cache-s3-access-key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
-          cache-s3-secret-key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
-          cache-s3-bucket-name: ${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}
+          cache_s3_endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
+          cache_s3_access_key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
+          cache_s3_secret_key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
+          cache_s3_bucket_name: ${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}
 
       - uses: "bckground/actions/autofix-prettier@main"
 

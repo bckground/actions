@@ -14,27 +14,29 @@ inputs:
       during merge.
     default: ""
     required: false
+  mise_version:
+    default: ""
   working_directory:
     description: "The directory with the root of the project"
     default: "."
     required: false
-  cache-s3-endpoint:
+  cache_s3_endpoint:
     type: "string"
     required: true
-  cache-s3-access-key:
+  cache_s3_access_key:
     type: "string"
     required: true
-  cache-s3-secret-key:
+  cache_s3_secret_key:
     type: "string"
     required: true
-  cache-s3-bucket-name:
+  cache_s3_bucket_name:
     type: "string"
     required: true
 
 outputs:
-  data-dir:
+  data_dir:
     description: "The path to mise's data directory"
-    value: "${{ steps.mise-cache-dirs.outputs.data-dir }}"
+    value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
 
 runs:
   using: "composite"
@@ -46,23 +48,23 @@ runs:
     - name: "Restore mise caches"
       uses: "bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8"
       with:
-        endpoint: "${{ inputs.cache-s3-endpoint }}"
-        accessKey: "${{ inputs.cache-s3-access-key }}"
-        secretKey: "${{ inputs.cache-s3-secret-key }}"
-        bucket: "${{ inputs.cache-s3-bucket-name }}"
+        endpoint: "${{ inputs.cache_s3_endpoint }}"
+        accessKey: "${{ inputs.cache_s3_access_key }}"
+        secretKey: "${{ inputs.cache_s3_secret_key }}"
+        bucket: "${{ inputs.cache_s3_bucket_name }}"
         use-fallback: false
         key: "mise-on-${{ runner.os }}-${{ runner.arch }}-"
         restore-keys: |
           mise-on-${{ runner.os }}-${{ runner.arch }}-
         path: |
-          ${{ steps.mise-cache-dirs.outputs.data-dir }}
+          ${{ steps.mise-cache-dirs.outputs.data_dir }}
 
     - name: "Set up mise"
       uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
       env:
         MISE_ENV: "${{ inputs.mise_envs }}"
       with:
-        version: "latest"
+        version: "${{ inputs.mise_version }}"
         install: true # Run `mise install`.
         cache: false
         experimental: true # Enable experimental features.

@@ -4,7 +4,7 @@ name: "mise - internal"
 outputs:
   data-dir:
     description: "The path to mise's data directory"
-    value: "${{ steps.mise-cache-dirs.outputs.data-dir }}"
+    value: "${{ steps.mise-cache-dirs.outputs.data_dir }}"
 
 runs:
   using: "composite"
