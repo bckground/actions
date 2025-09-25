@@ -1,0 +1,72 @@
+---
+name: "restore/setup mise"
+
+inputs:
+  mise_envs:
+    description: |
+      A comma-separated list of environments.
+
+      Mise looks for environment-targeted files named like mise.{ENV}.toml
+      alongside the base mise.toml, and merges them with a defined precedence.
+
+      Multiple environments can be specified in order, such as
+      `mise_envs: "ci,test"`, with the last in the list taking precedence
+      during merge.
+    default: ""
+    required: false
+  working_directory:
+    description: "The directory with the root of the project"
+    default: "."
+    required: false
+  cache-s3-endpoint:
+    type: "string"
+    required: true
+  cache-s3-access-key:
+    type: "string"
+    required: true
+  cache-s3-secret-key:
+    type: "string"
+    required: true
+  cache-s3-bucket-name:
+    type: "string"
+    required: true
+
+outputs:
+  data-dir:
+    description: "The path to mise's data directory"
+    value: "${{ steps.mise-cache-dirs.outputs.data-dir }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Retrieve mise directories to cache"
+      uses: "bckground/actions/setup-mise/internal@main"
+      id: "mise-cache-dirs"
+
+    - name: "Restore mise caches"
+      uses: "bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8"
+      with:
+        endpoint: "${{ inputs.cache-s3-endpoint }}"
+        accessKey: "${{ inputs.cache-s3-access-key }}"
+        secretKey: "${{ inputs.cache-s3-secret-key }}"
+        bucket: "${{ inputs.cache-s3-bucket-name }}"
+        use-fallback: false
+        key: "mise-on-${{ runner.os }}-${{ runner.arch }}-"
+        restore-keys: |
+          mise-on-${{ runner.os }}-${{ runner.arch }}-
+        path: |
+          ${{ steps.mise-cache-dirs.outputs.data-dir }}
+
+      - name: "Set up mise"
+        uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
+        env:
+          MISE_ENV: "${{ inputs.mise_envs }}"
+        with:
+          version: "latest"
+          install: true # Run `mise install`.
+          cache: false
+          experimental: true # Enable experimental features.
+          log_level: "debug"
+          working_directory: "${{ inputs.working_directory }}"
+          reshim: true
+
