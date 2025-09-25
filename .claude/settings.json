@@ -1,10 +1,7 @@
 {
-    "permissions": {
-	"allow": [
-	    "Bash(find:*)",
-	    "Bash(git town branch)"
-	],
-	"deny": [],
-	"ask": []
-    }
+  "permissions": {
+    "allow": ["Bash(find:*)", "Bash(git town branch)"],
+    "deny": [],
+    "ask": []
+  }
 }

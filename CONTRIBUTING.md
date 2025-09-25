@@ -22,13 +22,17 @@ The repository follows GitHub Actions composite action patterns:
 ## Development Commands
 
 ### Linting
+
 ```bash
 yamllint .
 ```
+
 Uses the `.yamllint` configuration file to lint all YAML files in the repository.
 
 ### Validation
+
 Since these are GitHub Actions, testing is typically done by:
+
 1. Using the actions in other repositories
 2. Validating YAML syntax with yamllint
 3. Checking action.yml schema compliance
@@ -36,6 +40,7 @@ Since these are GitHub Actions, testing is typically done by:
 ## Action Usage Patterns
 
 Both actions follow the composite action pattern:
+
 - Use `using: "composite"` in `action.yml`
 - Wrap external actions with pinned SHA versions for security
 - Accept configurable inputs with sensible defaults
