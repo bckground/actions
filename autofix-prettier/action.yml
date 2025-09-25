@@ -1,0 +1,38 @@
+---
+name: "Prettier - Autofix"
+description: |
+  This action runs `prettier` over the working tree and then autofix any
+  differences from running the tool.
+
+inputs:
+  config_file:
+    description: "Config file name under working directory"
+    default: ".prettierrc.yml"
+    required: false
+  working_directory:
+    description: "The directory with the root of the project"
+    default: "."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Check if prettier is installed"
+      shell: "bash"
+      run: |
+        if ! command -v prettier &> /dev/null; then
+          echo "Error: prettier is not installed or not in PATH"
+          echo "Please install prettier before using this action"
+          exit 1
+        fi
+        echo "Found prettier: $(prettier --version)"
+
+    - name: "Run prettier"
+      shell: "bash"
+      working-directory: "${{ inputs.working_directory }}"
+      run: |
+        prettier --config "${{ inputs.config_file }}" --write "${{ inputs.working_directory }}"
+
+    - name: "Run autofix"
+      uses: "autofix-ci/action@635ffb0c9798bd160680f18fd73371e355b85f27"
+
