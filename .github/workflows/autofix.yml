@@ -18,6 +18,8 @@ jobs:
 
       - uses: "bckground/actions/setup-mise/restore@main"
         with:
+          # For OVH, the endpoint must be: `s3.<region>.io.cloud.ovh.net`
+          # No URL scheme. Ignore the virtual hosted-style endpoint.
           cache_s3_endpoint: ${{ secrets.OVH_GHA_CACHE_ENDPOINT }}
           cache_s3_access_key: ${{ vars.OVH_GHA_CACHE_USER_SECRET_ID }}
           cache_s3_secret_key: ${{ secrets.OVH_GHA_CACHE_USER_SECRET }}
