@@ -20,12 +20,8 @@ jobs:
     steps:
       - uses: "actions/checkout@v5"
 
-      - uses: "bckground/actions/setup-mise/restore@main"
+      - uses: "bckground/actions/setup-mise@main"
         with:
           s3_credentials: "${{ env.S3_CREDENTIALS }}"
 
       - uses: "bckground/actions/autofix-prettier@main"
-
-      - uses: bckground/actions/setup-mise/save@main
-        with:
-          s3_credentials: "${{ env.S3_CREDENTIALS }}"
