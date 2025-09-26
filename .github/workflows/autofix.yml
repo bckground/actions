@@ -26,7 +26,6 @@ jobs:
 
       - uses: "bckground/actions/autofix-prettier@main"
 
-      - if: github.ref_name == 'main'
-        uses: bckground/actions/setup-mise/save@main
+      - uses: bckground/actions/setup-mise/save@main
         with:
           s3_credentials: "${{ env.S3_CREDENTIALS }}"
