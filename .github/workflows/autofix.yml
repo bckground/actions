@@ -3,11 +3,9 @@
 name: "autofix.ci"
 
 on:
-  push:
-    branches:
-      - "main"
   pull_request:
-    branches: ["*"]
+  push:
+    branches: ["main"]
 
 jobs:
   prettier:
@@ -18,10 +16,15 @@ jobs:
         ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
         secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
     steps:
-      - uses: "actions/checkout@v5"
+      - uses: "actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8" # v5.0.0
 
       - uses: "bckground/actions/setup-mise@main"
         with:
           s3_credentials: "${{ env.S3_CREDENTIALS }}"
 
-      - uses: "bckground/actions/autofix-prettier@main"
+      - name: "Run prettier"
+        run: |
+          prettier --config .prettierrc.yml --write "**/*.{yml,yaml,md,markdown,json,jsonc}"
+
+      - name: "Run autofix"
+        uses: "autofix-ci/action@635ffb0c9798bd160680f18fd73371e355b85f27"
