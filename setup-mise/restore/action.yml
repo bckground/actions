@@ -40,7 +40,7 @@ runs:
       id: "mise-config"
 
     - name: "Restore mise"
-      uses: "bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8"
+      uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}

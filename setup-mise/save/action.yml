@@ -74,7 +74,7 @@ runs:
           core.setOutput('hash', hash.digest('hex'));
 
     - name: "Check if the cache exists"
-      uses: bckground/actions-cache/restore@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+      uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       id: "cache-lookup"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
@@ -86,7 +86,7 @@ runs:
         key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
 
     - name: "Cache mise"
-      uses: bckground/actions-cache/save@8a7e86207dc72a3f6bd8cbc23f4f061558fee8f8
+      uses: "bckground/actions-cache/save@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       if: "steps.cache-lookup.outputs.cache-hit == 'false'"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
