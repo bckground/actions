@@ -1,5 +1,5 @@
 ---
-name: "setup-mise - save"
+name: "setup-mise"
 
 inputs:
   mise_envs:
@@ -14,6 +14,9 @@ inputs:
       during merge.
     default: ""
     required: false
+  mise_version:
+    description: "The mise version to install (defaults to the latest)"
+    default: ""
   working_directory:
     description: "The directory with the root of the project"
     default: "."
@@ -33,8 +36,9 @@ runs:
   using: "composite"
   steps:
     - name: "Retrieve mise configuration"
-      uses: "bckground/actions/setup-mise/internal@main"
       id: "mise-config"
+      run: |
+        echo "data_dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
 
     - name: "Calculate mise config hash"
       id: "mise-config-hash"
@@ -73,21 +77,40 @@ runs:
 
           core.setOutput('hash', hash.digest('hex'));
 
-    - name: "Check if the cache exists"
+    - name: "Restore mise cache"
+      id: "restore-mise-cache"
       uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
-      id: "cache-lookup"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        lookup-only: true
         key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+        restore-keys: |
+          mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
+        path: |
+          ${{ steps.mise-config.outputs.data_dir }}
 
-    - name: "Cache mise"
+    - name: "Set up mise"
+      uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
+      env:
+        MISE_ENV: "${{ inputs.mise_envs }}"
+      with:
+        version: "${{ inputs.mise_version }}"
+        install: true # Run `mise install`.
+        cache: false
+        experimental: true # Enable experimental features.
+        log_level: "debug"
+        working_directory: "${{ inputs.working_directory }}"
+        reshim: true
+
+    - name: "Save mise cache"
       uses: "bckground/actions-cache/save@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
-      if: "steps.cache-lookup.outputs.cache-hit == 'false'"
+      # `cache-hit == 'true'` means we found an exact match. We may have found
+      # a partial match; in that case, or in case we found no match, we save
+      # the cache.
+      if: "steps.restore-mise-cache.outputs.cache-hit == 'false'"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
