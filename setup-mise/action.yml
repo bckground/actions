@@ -102,7 +102,7 @@ runs:
         install: true # Run `mise install`.
         cache: false
         experimental: true # Enable experimental features.
-        log_level: "debug"
+        log_level: "warn"
         working_directory: "${{ inputs.working_directory }}"
         reshim: true
 
