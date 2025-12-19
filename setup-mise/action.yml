@@ -31,6 +31,9 @@ inputs:
       - bucket_name
     type: "string"
     required: true
+  cache_name:
+    type: "string"
+    required: true
 
 runs:
   using: "composite"
@@ -87,9 +90,9 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+        key: "mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
         restore-keys: |
-          mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
+          mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
 
@@ -118,6 +121,6 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+        key: "mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
