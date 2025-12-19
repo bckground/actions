@@ -16,6 +16,10 @@ inputs:
     type: "string"
     required: true
 
+outputs:
+  cache_hit:
+    value: ${{ steps.restore-go-caches.outputs.cache-hit }}
+
 runs:
   using: "composite"
   steps:
@@ -28,13 +32,14 @@ runs:
       run: |
         go clean -cache -modcache
 
-    - name: "Restore go caches"
+    - id: "restore-go-caches"
+      name: "Restore go caches"
       uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       with:
-        endpoint: "${{ fromJson(inputs.s3_credentials).endpoint }}"
-        accessKey: "${{ fromJson(inputs.s3_credentials).access_key }}"
-        secretKey: "${{ fromJson(inputs.s3_credentials).secret_key }}"
-        bucket: "${{ fromJson(inputs.s3_credentials).bucket_name }}"
+        endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
+        accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
+        secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
+        bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
         key: "go-${{ steps.go-config.outputs.go_version }}-${{ inputs.name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-"
         restore-keys: |
