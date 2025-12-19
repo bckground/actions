@@ -31,7 +31,7 @@ runs:
         secretKey: "${{ fromJson(inputs.s3_credentials).secret_key }}"
         bucket: "${{ fromJson(inputs.s3_credentials).bucket_name }}"
         use-fallback: false
-        key: go-${{ inputs.name }}-${{ steps.go-config.outputs.go_version }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        key: go-${{ steps.go-config.outputs.go_version }}-${{ inputs.name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
         path: |
           ${{ steps.go-config.outputs.mod_cache }}
           ${{ steps.go-config.outputs.build_cache }}
