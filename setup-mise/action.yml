@@ -110,6 +110,7 @@ runs:
         reshim: true
 
     - name: "Prune mise tools"
+      shell: "bash"
       run: |
         mise prune
 
