@@ -23,6 +23,11 @@ runs:
       uses: "bckground/actions/cache-go/internal@main"
       id: "go-config"
 
+    - name: "Clean cache directories"
+      shell: "bash"
+      run: |
+        go clean -cache -modcache
+
     - name: "Restore go caches"
       uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       with:
