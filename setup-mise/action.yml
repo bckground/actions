@@ -109,6 +109,10 @@ runs:
         working_directory: "${{ inputs.working_directory }}"
         reshim: true
 
+    - name: "Prune mise tools"
+      run: |
+        mise prune
+
     - name: "Save mise cache"
       uses: "bckground/actions-cache/save@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
       # `cache-hit == 'true'` means we found an exact match. We may have found
