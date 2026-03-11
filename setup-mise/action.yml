@@ -83,7 +83,7 @@ runs:
 
     - name: "Restore mise cache"
       id: "restore-mise-cache"
-      uses: "bckground/actions-cache/restore@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
+      uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
@@ -115,7 +115,7 @@ runs:
         mise prune
 
     - name: "Save mise cache"
-      uses: "bckground/actions-cache/save@9c316ce988fd9d40977dad01d0c7fa06792fa0da"
+      uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
       # `cache-hit == 'true'` means we found an exact match. We may have found
       # a partial match; in that case, or in case we found no match, we save
       # the cache.
