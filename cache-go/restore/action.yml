@@ -14,7 +14,7 @@ inputs:
     required: true
   name:
     type: "string"
-    required: true
+    default: "default"
   dependency-path:
     type: "string"
     default: "**/go.sum"
