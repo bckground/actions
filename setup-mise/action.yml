@@ -13,14 +13,12 @@ inputs:
       `mise_envs: "ci,test"`, with the last in the list taking precedence
       during merge.
     default: ""
-    required: false
   mise_version:
     description: "The mise version to install (defaults to the latest)"
     default: ""
   working_directory:
     description: "The directory with the root of the project"
     default: "."
-    required: false
   s3_credentials:
     description: |
       The S3 credentials as a JSON object. Must contain the following keys:
@@ -30,10 +28,10 @@ inputs:
       - secret_key
       - bucket_name
     type: "string"
-    required: true
+    default: ""
   cache_name:
     type: "string"
-    required: true
+    default: "default"
 
 runs:
   using: "composite"
@@ -45,6 +43,7 @@ runs:
         echo "data_dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
 
     - name: "Calculate mise config hash"
+      if: "inputs.s3_credentials != ''"
       id: "mise-config-hash"
       uses: "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" # v8.0.0
       env:
@@ -82,6 +81,7 @@ runs:
           core.setOutput('hash', hash.digest('hex'));
 
     - name: "Generate cache keys"
+      if: "inputs.s3_credentials != ''"
       id: "cache-keys"
       shell: "bash"
       run: |
@@ -91,6 +91,7 @@ runs:
         echo "restore-key=${prefix}-" | tee -a "$GITHUB_OUTPUT"
 
     - name: "Restore mise cache"
+      if: "inputs.s3_credentials != ''"
       id: "restore-mise-cache"
       uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
       with:
@@ -128,7 +129,7 @@ runs:
       # `cache-hit == 'true'` means we found an exact match. We may have found
       # a partial match; in that case, or in case we found no match, we save
       # the cache.
-      if: "steps.restore-mise-cache.outputs.cache-hit == 'false'"
+      if: "inputs.s3_credentials != '' && steps.restore-mise-cache.outputs.cache-hit == 'false'"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
