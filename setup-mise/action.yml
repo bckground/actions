@@ -97,7 +97,7 @@ runs:
           ${{ steps.mise-config.outputs.data_dir }}
 
     - name: "Set up mise"
-      uses: "jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566" # v3.2.0
+      uses: "jdx/mise-action@1648a7812b9aeae629881980618f079932869151" # v4.0.1
       env:
         MISE_ENV: "${{ inputs.mise_envs }}"
       with:
