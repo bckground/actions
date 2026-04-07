@@ -81,6 +81,15 @@ runs:
 
           core.setOutput('hash', hash.digest('hex'));
 
+    - name: "Generate cache keys"
+      id: "cache-keys"
+      shell: "bash"
+      run: |
+        repo="${{ github.repository }}"
+        prefix="mise-${{ inputs.cache_name }}-at-${repo//\//-}-on-${{ runner.os }}-${{ runner.arch }}"
+        echo "key=${prefix}-${{ steps.mise-config-hash.outputs.hash }}" | tee -a "$GITHUB_OUTPUT"
+        echo "restore-key=${prefix}-" | tee -a "$GITHUB_OUTPUT"
+
     - name: "Restore mise cache"
       id: "restore-mise-cache"
       uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
@@ -90,9 +99,9 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+        key: "${{ steps.cache-keys.outputs.key }}"
         restore-keys: |
-          mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.cache-keys.outputs.restore-key }}
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
 
@@ -126,6 +135,6 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "mise-${{ inputs.cache_name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-${{ steps.mise-config-hash.outputs.hash }}"
+        key: "${{ steps.cache-keys.outputs.key }}"
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
