@@ -5,9 +5,8 @@ inputs:
   name:
     type: "string"
     required: true
-  dependency-path:
+  dependency_path:
     type: "string"
-    required: true
 
 outputs:
   go_version:
@@ -41,30 +40,28 @@ runs:
       id: "dependency-hash"
       uses: "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" # v8.0.0
       env:
-        DEPENDENCY_PATH: "${{ inputs.dependency-path }}"
+        DEPENDENCY_PATH: "${{ inputs.dependency_path }}"
       with:
         script: |
           const fs = require('fs');
-          const crypto = require('crypto');
+          const path = require('path');
 
-          const patterns = process.env.DEPENDENCY_PATH;
-          const globber = await glob.create(patterns);
-          const files = (await globber.glob()).sort();
-
-          console.log('Files being hashed:', files);
-
-          const hash = crypto.createHash('sha256');
-          for (const file of files) {
-            if (fs.existsSync(file)) {
-              console.log('Hashing file:', file);
-              const content = fs.readFileSync(file);
-              hash.update(content);
-            } else {
-              console.log('File not found:', file);
+          let dependencyPath = process.env.DEPENDENCY_PATH;
+          if (!dependencyPath) {
+            const workspace = process.env.GITHUB_WORKSPACE;
+            const rootContent = fs.readdirSync(workspace);
+            if (!rootContent.includes('go.sum')) {
+              throw new Error(`Dependencies file is not found in ${workspace}. Supported file pattern: go.sum`);
             }
+            dependencyPath = path.join(workspace, 'go.sum');
           }
 
-          core.setOutput('hash', hash.digest('hex'));
+          const hash = await glob.hashFiles(dependencyPath);
+          if (!hash) {
+            throw new Error('Some specified paths were not resolved, unable to cache dependencies.');
+          }
+
+          core.setOutput('hash', hash);
 
     - name: "Generate cache keys"
       id: "cache-keys"

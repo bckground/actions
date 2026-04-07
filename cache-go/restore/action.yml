@@ -15,9 +15,8 @@ inputs:
   name:
     type: "string"
     default: "default"
-  dependency-path:
+  dependency_path:
     type: "string"
-    default: "**/go.sum"
 
 outputs:
   cache_hit:
@@ -31,7 +30,7 @@ runs:
       id: "go-config"
       with:
         name: "${{ inputs.name }}"
-        dependency-path: "${{ inputs.dependency-path }}"
+        dependency_path: "${{ inputs.dependency_path }}"
 
     - name: "Clean cache directories"
       shell: "bash"

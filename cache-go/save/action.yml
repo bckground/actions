@@ -15,9 +15,8 @@ inputs:
   name:
     type: "string"
     default: "default"
-  dependency-path:
+  dependency_path:
     type: "string"
-    default: "**/go.sum"
 
 runs:
   using: "composite"
@@ -27,7 +26,7 @@ runs:
       id: "go-config"
       with:
         name: "${{ inputs.name }}"
-        dependency-path: "${{ inputs.dependency-path }}"
+        dependency_path: "${{ inputs.dependency_path }}"
 
     - name: "Cache go"
       uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
