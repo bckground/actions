@@ -15,6 +15,9 @@ inputs:
   name:
     type: "string"
     required: true
+  dependency-path:
+    type: "string"
+    default: "**/go.sum"
 
 outputs:
   cache_hit:
@@ -26,6 +29,9 @@ runs:
     - name: "Retrieve go configuration"
       uses: "bckground/actions/cache-go/internal@main"
       id: "go-config"
+      with:
+        name: "${{ inputs.name }}"
+        dependency-path: "${{ inputs.dependency-path }}"
 
     - name: "Clean cache directories"
       shell: "bash"
@@ -41,9 +47,9 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "go-${{ steps.go-config.outputs.go_version }}-${{ inputs.name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-"
+        key: "${{ steps.go-config.outputs.cache_key }}"
         restore-keys: |
-          go-${{ steps.go-config.outputs.go_version }}-${{ inputs.name }}-at-${{ github.repository }}-on-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.go-config.outputs.cache_restore_key }}
         path: |
           ${{ steps.go-config.outputs.mod_cache }}
           ${{ steps.go-config.outputs.build_cache }}
