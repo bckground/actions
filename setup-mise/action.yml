@@ -19,9 +19,18 @@ inputs:
   working_directory:
     description: "The directory with the root of the project"
     default: "."
+  cache_backend:
+    description: |
+      Which cache backend to use: "s3", "github", or "none".
+
+      Defaults to "none" (no caching). When set to "s3", s3_credentials is
+      required.
+    type: "string"
+    default: "none"
   s3_credentials:
     description: |
-      The S3 credentials as a JSON object. Must contain the following keys:
+      The S3 credentials as a JSON object. Required when cache_backend is "s3".
+      Must contain the following keys:
 
       - endpoint (no URL scheme)
       - access_key
@@ -36,6 +45,26 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: "Validate cache configuration"
+      shell: "bash"
+      env:
+        CACHE_BACKEND: "${{ inputs.cache_backend }}"
+        S3_CREDENTIALS: "${{ inputs.s3_credentials }}"
+      run: |
+        case "$CACHE_BACKEND" in
+          s3)
+            if [ -z "$S3_CREDENTIALS" ]; then
+              echo "::error::cache_backend is 's3' but s3_credentials was not provided"
+              exit 1
+            fi
+            ;;
+          github | none) ;;
+          *)
+            echo "::error::invalid cache_backend '$CACHE_BACKEND' (expected: s3, github, or none)"
+            exit 1
+            ;;
+        esac
+
     - name: "Retrieve mise configuration"
       id: "mise-config"
       shell: "bash"
@@ -43,7 +72,7 @@ runs:
         echo "data_dir=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}" | tee -a "$GITHUB_OUTPUT"
 
     - name: "Calculate mise config hash"
-      if: "inputs.s3_credentials != ''"
+      if: "inputs.cache_backend != 'none'"
       id: "mise-config-hash"
       uses: "actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd" # v8.0.0
       env:
@@ -81,7 +110,7 @@ runs:
           core.setOutput('hash', hash.digest('hex'));
 
     - name: "Generate cache keys"
-      if: "inputs.s3_credentials != ''"
+      if: "inputs.cache_backend != 'none'"
       id: "cache-keys"
       shell: "bash"
       run: |
@@ -90,9 +119,9 @@ runs:
         echo "key=${prefix}-${{ steps.mise-config-hash.outputs.hash }}" | tee -a "$GITHUB_OUTPUT"
         echo "restore-key=${prefix}-" | tee -a "$GITHUB_OUTPUT"
 
-    - name: "Restore mise cache"
-      if: "inputs.s3_credentials != ''"
-      id: "restore-mise-cache"
+    - name: "Restore mise cache (S3)"
+      if: "inputs.cache_backend == 's3'"
+      id: "restore-mise-cache-s3"
       uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
@@ -100,6 +129,17 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
+        key: "${{ steps.cache-keys.outputs.key }}"
+        restore-keys: |
+          ${{ steps.cache-keys.outputs.restore-key }}
+        path: |
+          ${{ steps.mise-config.outputs.data_dir }}
+
+    - name: "Restore mise cache (GitHub)"
+      if: "inputs.cache_backend == 'github'"
+      id: "restore-mise-cache-github"
+      uses: "actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      with:
         key: "${{ steps.cache-keys.outputs.key }}"
         restore-keys: |
           ${{ steps.cache-keys.outputs.restore-key }}
@@ -124,18 +164,25 @@ runs:
       run: |
         mise prune
 
-    - name: "Save mise cache"
+    - name: "Save mise cache (S3)"
       uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
-      # `cache-hit == 'true'` means we found an exact match. We may have found
-      # a partial match; in that case, or in case we found no match, we save
-      # the cache.
-      if: "inputs.s3_credentials != '' && steps.restore-mise-cache.outputs.cache-hit == 'false'"
+      # We save the cache on a miss or a partial (restore-key) match. An exact
+      # match sets cache-hit to 'true'; anything else leaves it 'false' or empty.
+      if: "inputs.cache_backend == 's3' && steps.restore-mise-cache-s3.outputs.cache-hit != 'true'"
       with:
         endpoint: ${{ fromJson(inputs.s3_credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3_credentials).access_key }}
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
+        key: "${{ steps.cache-keys.outputs.key }}"
+        path: |
+          ${{ steps.mise-config.outputs.data_dir }}
+
+    - name: "Save mise cache (GitHub)"
+      uses: "actions/cache/save@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      if: "inputs.cache_backend == 'github' && steps.restore-mise-cache-github.outputs.cache-hit != 'true'"
+      with:
         key: "${{ steps.cache-keys.outputs.key }}"
         path: |
           ${{ steps.mise-config.outputs.data_dir }}
