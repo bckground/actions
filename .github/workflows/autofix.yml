@@ -10,7 +10,7 @@ on:
 jobs:
   prettier:
     name: "prettier"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     env:
       S3_CREDENTIALS: >-
         ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',

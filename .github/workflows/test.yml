@@ -9,7 +9,7 @@ on:
 jobs:
   preflight:
     name: "preflight"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     outputs:
       setup_mise_backends: "${{ steps.set.outputs.setup_mise_backends }}"
       cache_go_backends: "${{ steps.set.outputs.cache_go_backends }}"
@@ -32,7 +32,7 @@ jobs:
 
   guard:
     name: "validation guard"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     steps:
       - uses: "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" # v7.0.0
 
@@ -82,7 +82,7 @@ jobs:
   setup-mise:
     name: "setup-mise (${{ matrix.backend }})"
     needs: "preflight"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     strategy:
       fail-fast: false
       matrix:
@@ -107,7 +107,7 @@ jobs:
   cache-go:
     name: "cache-go (${{ matrix.backend }})"
     needs: "preflight"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     strategy:
       fail-fast: false
       matrix:

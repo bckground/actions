@@ -14,7 +14,7 @@ on:
 jobs:
   check_cla_signature:
     name: "check signature"
-    runs-on: "ubuntu-latest"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     permissions:
       actions: "write"
       contents: "read" # CLA signatures are stored in https://github.com/bckground/cla
