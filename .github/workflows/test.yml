@@ -50,8 +50,9 @@ jobs:
         with:
           cache_backend: "s3"
 
-      - name: "cache-go none is a no-op"
+      - name: "cache-go rejects none"
         id: "cachego-none"
+        continue-on-error: true
         uses: "./cache-go/restore"
         with:
           cache_backend: "none"
@@ -61,7 +62,7 @@ jobs:
         env:
           INVALID_BACKEND_OUTCOME: "${{ steps.invalid-backend.outcome }}"
           S3_NO_CREDENTIALS_OUTCOME: "${{ steps.s3-no-credentials.outcome }}"
-          CACHEGO_NONE_HIT: "${{ steps.cachego-none.outputs.cache_hit }}"
+          CACHEGO_NONE_OUTCOME: "${{ steps.cachego-none.outcome }}"
         run: |
           fail=0
           if [ "$INVALID_BACKEND_OUTCOME" != "failure" ]; then
@@ -72,8 +73,8 @@ jobs:
             echo "::error::s3 without credentials should fail (got '$S3_NO_CREDENTIALS_OUTCOME')"
             fail=1
           fi
-          if [ -n "$CACHEGO_NONE_HIT" ]; then
-            echo "::error::cache-go none should yield empty cache_hit (got '$CACHEGO_NONE_HIT')"
+          if [ "$CACHEGO_NONE_OUTCOME" != "failure" ]; then
+            echo "::error::cache-go should reject cache_backend 'none' (got '$CACHEGO_NONE_OUTCOME')"
             fail=1
           fi
           exit "$fail"
