@@ -8,47 +8,63 @@ This repository contains reusable GitHub Actions for bckground labs projects. It
 
 The repository follows GitHub Actions composite action patterns:
 
-- **`yaml-lint/`** - YAML linting action using yamllint
 - **`cla-check/`** - CLA (Contributor License Agreement) checking action
+- **`setup-mise/`** - Installs [mise](https://mise.jdx.dev/) and the project's tools, with optional caching (S3 or GitHub-native) of the mise data directory
+- **`cache-go/`** - Go module and build caching with a selectable backend (S3 or GitHub-native), with two sub-actions sharing a helper script:
+  - `restore/` - Restores the Go module and build caches
+  - `save/` - Saves the Go module and build caches
+  - `internal/go-cache-config.sh` - Shared script (resolves the Go configuration and computes the cache keys) that `restore` and `save` invoke via `github.action_path`, so both run it at the same ref
 - Each action directory contains:
   - `action.yml` - Action definition with inputs, outputs, and steps
   - Composite actions that wrap external actions with organization-specific defaults
 
 ## Key Configuration Files
 
-- **`.yamllint`** - YAML linting configuration with quoted-strings enabled and line-length disabled
+- **`mise.toml`** - mise tool versions (Node.js, prettier, actionlint, shellcheck) used for local development and in CI
+- **`.prettierrc.yml`** - Prettier configuration for formatting YAML, Markdown, and JSON
 - **`.github/dependabot.yml`** - Monthly GitHub Actions dependency updates with `area/dependencies` labels
 
 ## Development Commands
 
+### Formatting
+
+```bash
+prettier --config .prettierrc.yml --write "**/*.{yml,yaml,md,markdown,json,jsonc}"
+```
+
+Formats all YAML, Markdown, and JSON files. prettier is provided through `mise` (see `mise.toml`), so run `mise install` first. The same command runs in CI through the `autofix.ci` workflow.
+
 ### Linting
 
 ```bash
-yamllint .
+actionlint
+shellcheck cache-go/internal/*.sh
 ```
 
-Uses the `.yamllint` configuration file to lint all YAML files in the repository.
+`actionlint` lints the workflow files (and runs `shellcheck` on their inline scripts); `shellcheck` lints the standalone helper scripts. Both tools are provided through `mise`. The same checks run in CI through the `lint` workflow.
 
 ### Validation
 
-Since these are GitHub Actions, testing is typically done by:
+Beyond the linting and formatting above, behavior is validated through:
 
-1. Using the actions in other repositories
-2. Validating YAML syntax with yamllint
-3. Checking action.yml schema compliance
+1. The `test` workflow, which exercises the validation guard, `setup-mise`, and the `cache-go` save/restore round-trip across the `none`, `github`, and `s3` backends (the `s3` jobs run only when their secrets are available). It uses a minimal Go module fixture under `_test/fixtures/go`.
+2. Using the actions in other repositories
 
 ## Action Usage Patterns
 
-Both actions follow the composite action pattern:
+The actions follow the composite action pattern:
 
 - Use `using: "composite"` in `action.yml`
 - Wrap external actions with pinned SHA versions for security
 - Accept configurable inputs with sensible defaults
 - Use environment variables for sensitive data (tokens)
+- Select the cache backend with the `cache_backend` input (`s3` | `github` | `none`, default `none`) for the cache-backed actions; pass `s3_credentials` as a single JSON object input when using the `s3` backend
 
 ## Dependencies
 
-- **yaml-lint action**: Uses `ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c` (v3.1.1)
-- **cla-check action**: Uses `cla-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08` (v2.6.1)
+External action dependencies are pinned to specific SHA commits for security and reproducibility:
 
-All external action dependencies are pinned to specific SHA commits for security and reproducibility.
+- **cla-check**: `cla-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08` (v2.6.1)
+- **cache-go** and **setup-mise**: `actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd` (v8.0.0) for hashing, `tespkg/actions-cache@570a8ae32f67c95bcaca3f8cc88702cd318291e9` (v1.10.0) for the `s3` cache backend, and `actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8` (v6.0.0) for the `github` cache backend
+- **setup-mise**: `jdx/mise-action@1648a7812b9aeae629881980618f079932869151` (v4.0.1)
+- **CI workflows**: `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd` (v6.0.2) and `actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16` (v6.5.0); the `lint` workflow also runs `jdx/mise-action` (above) directly

@@ -1,0 +1,158 @@
+---
+name: "test"
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  preflight:
+    name: "preflight"
+    runs-on: "ubuntu-latest"
+    outputs:
+      setup_mise_backends: "${{ steps.set.outputs.setup_mise_backends }}"
+      cache_go_backends: "${{ steps.set.outputs.cache_go_backends }}"
+    steps:
+      # The s3 backend needs OVH secrets, which are unavailable on fork PRs.
+      # Only include s3 in the matrices when the secret is present.
+      - name: "Determine testable backends"
+        id: "set"
+        shell: "bash"
+        env:
+          S3_BUCKET: "${{ secrets.OVH_GHA_CACHE_BUCKET_NAME }}"
+        run: |
+          if [ -n "$S3_BUCKET" ]; then
+            echo 'setup_mise_backends=["none","github","s3"]' | tee -a "$GITHUB_OUTPUT"
+            echo 'cache_go_backends=["github","s3"]' | tee -a "$GITHUB_OUTPUT"
+          else
+            echo 'setup_mise_backends=["none","github"]' | tee -a "$GITHUB_OUTPUT"
+            echo 'cache_go_backends=["github"]' | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  guard:
+    name: "validation guard"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+      - name: "Reject invalid cache_backend"
+        id: "invalid-backend"
+        continue-on-error: true
+        uses: "./setup-mise"
+        with:
+          cache_backend: "bogus"
+
+      - name: "Reject s3 without credentials"
+        id: "s3-no-credentials"
+        continue-on-error: true
+        uses: "./setup-mise"
+        with:
+          cache_backend: "s3"
+
+      - name: "cache-go none is a no-op"
+        id: "cachego-none"
+        uses: "./cache-go/restore"
+        with:
+          cache_backend: "none"
+
+      - name: "Assert guard behavior"
+        shell: "bash"
+        env:
+          INVALID_BACKEND_OUTCOME: "${{ steps.invalid-backend.outcome }}"
+          S3_NO_CREDENTIALS_OUTCOME: "${{ steps.s3-no-credentials.outcome }}"
+          CACHEGO_NONE_HIT: "${{ steps.cachego-none.outputs.cache_hit }}"
+        run: |
+          fail=0
+          if [ "$INVALID_BACKEND_OUTCOME" != "failure" ]; then
+            echo "::error::invalid cache_backend should fail (got '$INVALID_BACKEND_OUTCOME')"
+            fail=1
+          fi
+          if [ "$S3_NO_CREDENTIALS_OUTCOME" != "failure" ]; then
+            echo "::error::s3 without credentials should fail (got '$S3_NO_CREDENTIALS_OUTCOME')"
+            fail=1
+          fi
+          if [ -n "$CACHEGO_NONE_HIT" ]; then
+            echo "::error::cache-go none should yield empty cache_hit (got '$CACHEGO_NONE_HIT')"
+            fail=1
+          fi
+          exit "$fail"
+
+  setup-mise:
+    name: "setup-mise (${{ matrix.backend }})"
+    needs: "preflight"
+    runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: "${{ fromJSON(needs.preflight.outputs.setup_mise_backends) }}"
+    env:
+      S3_CREDENTIALS: >-
+        ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
+        secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
+    steps:
+      - uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+      - name: "Set up mise"
+        uses: "./setup-mise"
+        with:
+          cache_backend: "${{ matrix.backend }}"
+          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+
+      - name: "Assert tools are available"
+        run: |
+          prettier --version
+
+  cache-go:
+    name: "cache-go (${{ matrix.backend }})"
+    needs: "preflight"
+    runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: "${{ fromJSON(needs.preflight.outputs.cache_go_backends) }}"
+    env:
+      S3_CREDENTIALS: >-
+        ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
+        secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
+    steps:
+      - uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+      - uses: "actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16" # v6.5.0
+        with:
+          go-version: "1.24"
+          cache: false
+
+      - name: "Populate go caches"
+        working-directory: "_test/fixtures/go"
+        run: |
+          go mod download
+          go build -o /dev/null .
+
+      - name: "Save go caches"
+        uses: "./cache-go/save"
+        with:
+          cache_backend: "${{ matrix.backend }}"
+          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency_path: "_test/fixtures/go/go.sum"
+
+      - name: "Restore go caches"
+        id: "restore"
+        uses: "./cache-go/restore"
+        with:
+          cache_backend: "${{ matrix.backend }}"
+          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency_path: "_test/fixtures/go/go.sum"
+
+      - name: "Assert cache hit"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          CACHE_HIT: "${{ steps.restore.outputs.cache_hit }}"
+        run: |
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::expected cache_hit=true for backend '$BACKEND', got '$CACHE_HIT'"
+            exit 1
+          fi
