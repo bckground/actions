@@ -20,7 +20,7 @@ jobs:
 
       - uses: "bckground/actions/setup-mise@main"
         with:
-          cache_backend: "s3"
+          cache_backend: "github"
           s3_credentials: "${{ env.S3_CREDENTIALS }}"
 
       - name: "Run prettier"
