@@ -1,15 +1,14 @@
 ---
 name: "cache-go - save"
-description: "Saves the Go module and build caches to the configured backend (s3, github, or none)."
+description: "Saves the Go module and build caches to the configured backend (s3 or github)."
 
 inputs:
   cache_backend:
     description: |
-      Which cache backend to use: "s3", "github", or "none".
+      Which cache backend to use: "s3" or "github".
 
-      Defaults to "none" (no caching). When set to "s3", s3_credentials is
-      required.
-    default: "none"
+      Required. When set to "s3", s3_credentials is required.
+    required: true
   s3_credentials:
     description: |
       The S3 credentials as a JSON object. Required when cache_backend is "s3".
@@ -41,15 +40,14 @@ runs:
               exit 1
             fi
             ;;
-          github | none) ;;
+          github) ;;
           *)
-            echo "::error::invalid cache_backend '$CACHE_BACKEND' (expected: s3, github, or none)"
+            echo "::error::invalid cache_backend '$CACHE_BACKEND' (expected: s3 or github)"
             exit 1
             ;;
         esac
 
     - name: "Resolve go cache configuration"
-      if: "inputs.cache_backend != 'none'"
       id: "go-cache"
       shell: "bash"
       env:

@@ -24,9 +24,9 @@ inputs:
     description: |
       Which cache backend to use: "s3", "github", or "none".
 
-      Defaults to "none" (no caching). When set to "s3", s3_credentials is
-      required.
-    default: "none"
+      Required. Use "none" to install tools without caching. When set to
+      "s3", s3_credentials is required.
+    required: true
   s3_credentials:
     description: |
       The S3 credentials as a JSON object. Required when cache_backend is "s3".
