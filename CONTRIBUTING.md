@@ -23,6 +23,7 @@ The repository follows GitHub Actions composite action patterns:
 - **`mise.toml`** - mise tool versions (Node.js, prettier, actionlint, shellcheck) used for local development and in CI
 - **`.prettierrc.yml`** - Prettier configuration for formatting YAML, Markdown, and JSON
 - **`.github/dependabot.yml`** - Monthly GitHub Actions dependency updates with `area/dependencies` labels
+- **`.github/actionlint.yaml`** - Declares the custom Blacksmith runner labels so `actionlint` accepts the `runs-on` values
 
 ## Development Commands
 

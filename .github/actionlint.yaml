@@ -1,0 +1,6 @@
+---
+# Blacksmith runner labels are custom self-hosted labels, so actionlint must be
+# told about them or it rejects `runs-on` with an "unknown label" error.
+self-hosted-runner:
+  labels:
+    - "blacksmith-2vcpu-ubuntu-2404-arm"
