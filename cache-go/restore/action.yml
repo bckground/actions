@@ -1,5 +1,6 @@
 ---
 name: "cache-go - restore"
+description: "Restores the Go module and build caches from the configured backend (s3, github, or none)."
 
 inputs:
   cache_backend:
@@ -8,7 +9,6 @@ inputs:
 
       Defaults to "none" (no caching). When set to "s3", s3_credentials is
       required.
-    type: "string"
     default: "none"
   s3_credentials:
     description: |
@@ -19,13 +19,11 @@ inputs:
       - access_key
       - secret_key
       - bucket_name
-    type: "string"
     default: ""
   name:
-    type: "string"
     default: "default"
   dependency_path:
-    type: "string"
+    description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
 outputs:
   cache_hit:
@@ -54,13 +52,15 @@ runs:
             ;;
         esac
 
-    - name: "Retrieve go configuration"
+    - name: "Resolve go cache configuration"
       if: "inputs.cache_backend != 'none'"
-      uses: "bckground/actions/cache-go/internal@main"
-      id: "go-config"
-      with:
-        name: "${{ inputs.name }}"
-        dependency_path: "${{ inputs.dependency_path }}"
+      id: "go-cache"
+      shell: "bash"
+      env:
+        CACHE_NAME: "${{ inputs.name }}"
+        DEP_HASH: "${{ hashFiles(inputs.dependency_path == '' && 'go.sum' || inputs.dependency_path) }}"
+      run: |
+        bash "${{ github.action_path }}/../internal/go-cache-config.sh"
 
     - name: "Clean cache directories"
       if: "inputs.cache_backend != 'none'"
@@ -78,21 +78,21 @@ runs:
         secretKey: ${{ fromJson(inputs.s3_credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3_credentials).bucket_name }}
         use-fallback: false
-        key: "${{ steps.go-config.outputs.cache_key }}"
+        key: "${{ steps.go-cache.outputs.key }}"
         restore-keys: |
-          ${{ steps.go-config.outputs.cache_restore_key }}
+          ${{ steps.go-cache.outputs.restore-key }}
         path: |
-          ${{ steps.go-config.outputs.mod_cache }}
-          ${{ steps.go-config.outputs.build_cache }}
+          ${{ steps.go-cache.outputs.mod_cache }}
+          ${{ steps.go-cache.outputs.build_cache }}
 
     - id: "restore-go-caches-github"
       name: "Restore go caches (GitHub)"
       if: "inputs.cache_backend == 'github'"
       uses: "actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
       with:
-        key: "${{ steps.go-config.outputs.cache_key }}"
+        key: "${{ steps.go-cache.outputs.key }}"
         restore-keys: |
-          ${{ steps.go-config.outputs.cache_restore_key }}
+          ${{ steps.go-cache.outputs.restore-key }}
         path: |
-          ${{ steps.go-config.outputs.mod_cache }}
-          ${{ steps.go-config.outputs.build_cache }}
+          ${{ steps.go-cache.outputs.mod_cache }}
+          ${{ steps.go-cache.outputs.build_cache }}

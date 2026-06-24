@@ -10,10 +10,10 @@ The repository follows GitHub Actions composite action patterns:
 
 - **`cla-check/`** - CLA (Contributor License Agreement) checking action
 - **`setup-mise/`** - Installs [mise](https://mise.jdx.dev/) and the project's tools, with optional caching (S3 or GitHub-native) of the mise data directory
-- **`cache-go/`** - Go module and build caching with a selectable backend (S3 or GitHub-native), split into composable sub-actions:
-  - `internal/` - Resolves the Go configuration (version, cache paths) and computes the cache keys; shared by the other two
+- **`cache-go/`** - Go module and build caching with a selectable backend (S3 or GitHub-native), with two sub-actions sharing a helper script:
   - `restore/` - Restores the Go module and build caches
   - `save/` - Saves the Go module and build caches
+  - `internal/go-cache-config.sh` - Shared script (resolves the Go configuration and computes the cache keys) that `restore` and `save` invoke via `github.action_path`, so both run it at the same ref
 - Each action directory contains:
   - `action.yml` - Action definition with inputs, outputs, and steps
   - Composite actions that wrap external actions with organization-specific defaults

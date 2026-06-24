@@ -1,5 +1,6 @@
 ---
 name: "setup-mise"
+description: "Installs mise and the project's tools, with optional caching (s3 or github) of the mise data directory."
 
 inputs:
   mise_envs:
@@ -25,7 +26,6 @@ inputs:
 
       Defaults to "none" (no caching). When set to "s3", s3_credentials is
       required.
-    type: "string"
     default: "none"
   s3_credentials:
     description: |
@@ -36,10 +36,8 @@ inputs:
       - access_key
       - secret_key
       - bucket_name
-    type: "string"
     default: ""
   cache_name:
-    type: "string"
     default: "default"
 
 runs:
