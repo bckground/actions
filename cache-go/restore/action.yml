@@ -26,7 +26,12 @@ inputs:
 
 outputs:
   cache_hit:
-    value: ${{ steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit }}
+    # actions/cache (and the s3 fork) leave cache-hit unset (empty) on a total
+    # miss and only set 'false' on a restore-key match, so coerce to a strict
+    # 'true'/'false' boolean. The parentheses are required: '==' binds tighter
+    # than '||', so without them the comparison would only apply to the github
+    # output.
+    value: ${{ (steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit) == 'true' }}
 
 runs:
   using: "composite"

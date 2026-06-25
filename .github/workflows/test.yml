@@ -157,3 +157,23 @@ jobs:
             echo "::error::expected cache_hit=true for backend '$BACKEND', got '$CACHE_HIT'"
             exit 1
           fi
+
+      - name: "Restore a never-saved key"
+        id: "restore-miss"
+        uses: "./cache-go/restore"
+        with:
+          cache_backend: "${{ matrix.backend }}"
+          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-miss-${{ github.run_id }}-${{ github.run_attempt }}"
+          dependency_path: "_test/fixtures/go/go.sum"
+
+      - name: "Assert cache miss reports 'false', not empty"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          CACHE_HIT: "${{ steps.restore-miss.outputs.cache_hit }}"
+        run: |
+          if [ "$CACHE_HIT" != "false" ]; then
+            echo "::error::expected cache_hit=false on a miss for backend '$BACKEND', got '$CACHE_HIT'"
+            exit 1
+          fi
