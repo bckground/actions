@@ -8,8 +8,8 @@ on:
     branches: ["main"]
 
 jobs:
-  prettier:
-    name: "prettier"
+  lint:
+    name: "lint"
     runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     env:
       S3_CREDENTIALS: >-
