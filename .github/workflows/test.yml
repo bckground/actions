@@ -36,26 +36,26 @@ jobs:
     steps:
       - uses: "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" # v7.0.0
 
-      - name: "Reject invalid cache_backend"
+      - name: "Reject invalid cache-backend"
         id: "invalid-backend"
         continue-on-error: true
         uses: "./setup-mise"
         with:
-          cache_backend: "bogus"
+          cache-backend: "bogus"
 
       - name: "Reject s3 without credentials"
         id: "s3-no-credentials"
         continue-on-error: true
         uses: "./setup-mise"
         with:
-          cache_backend: "s3"
+          cache-backend: "s3"
 
       - name: "cache-go rejects none"
         id: "cachego-none"
         continue-on-error: true
         uses: "./cache-go/restore"
         with:
-          cache_backend: "none"
+          cache-backend: "none"
 
       - name: "Assert guard behavior"
         shell: "bash"
@@ -66,7 +66,7 @@ jobs:
         run: |
           fail=0
           if [ "$INVALID_BACKEND_OUTCOME" != "failure" ]; then
-            echo "::error::invalid cache_backend should fail (got '$INVALID_BACKEND_OUTCOME')"
+            echo "::error::invalid cache-backend should fail (got '$INVALID_BACKEND_OUTCOME')"
             fail=1
           fi
           if [ "$S3_NO_CREDENTIALS_OUTCOME" != "failure" ]; then
@@ -74,7 +74,7 @@ jobs:
             fail=1
           fi
           if [ "$CACHEGO_NONE_OUTCOME" != "failure" ]; then
-            echo "::error::cache-go should reject cache_backend 'none' (got '$CACHEGO_NONE_OUTCOME')"
+            echo "::error::cache-go should reject cache-backend 'none' (got '$CACHEGO_NONE_OUTCOME')"
             fail=1
           fi
           exit "$fail"
@@ -97,8 +97,8 @@ jobs:
       - name: "Set up mise"
         uses: "./setup-mise"
         with:
-          cache_backend: "${{ matrix.backend }}"
-          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
 
       - name: "Assert tools are available"
         run: |
@@ -133,28 +133,28 @@ jobs:
       - name: "Save go caches"
         uses: "./cache-go/save"
         with:
-          cache_backend: "${{ matrix.backend }}"
-          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
           name: "ci-cache-go-test"
-          dependency_path: "_test/fixtures/go/go.sum"
+          dependency-path: "_test/fixtures/go/go.sum"
 
       - name: "Restore go caches"
         id: "restore"
         uses: "./cache-go/restore"
         with:
-          cache_backend: "${{ matrix.backend }}"
-          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
           name: "ci-cache-go-test"
-          dependency_path: "_test/fixtures/go/go.sum"
+          dependency-path: "_test/fixtures/go/go.sum"
 
       - name: "Assert cache hit"
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          CACHE_HIT: "${{ steps.restore.outputs.cache_hit }}"
+          CACHE_HIT: "${{ steps.restore.outputs.cache-hit }}"
         run: |
           if [ "$CACHE_HIT" != "true" ]; then
-            echo "::error::expected cache_hit=true for backend '$BACKEND', got '$CACHE_HIT'"
+            echo "::error::expected cache-hit=true for backend '$BACKEND', got '$CACHE_HIT'"
             exit 1
           fi
 
@@ -162,18 +162,18 @@ jobs:
         id: "restore-miss"
         uses: "./cache-go/restore"
         with:
-          cache_backend: "${{ matrix.backend }}"
-          s3_credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
           name: "ci-cache-go-miss-${{ github.run_id }}-${{ github.run_attempt }}"
-          dependency_path: "_test/fixtures/go/go.sum"
+          dependency-path: "_test/fixtures/go/go.sum"
 
       - name: "Assert cache miss reports 'false', not empty"
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          CACHE_HIT: "${{ steps.restore-miss.outputs.cache_hit }}"
+          CACHE_HIT: "${{ steps.restore-miss.outputs.cache-hit }}"
         run: |
           if [ "$CACHE_HIT" != "false" ]; then
-            echo "::error::expected cache_hit=false on a miss for backend '$BACKEND', got '$CACHE_HIT'"
+            echo "::error::expected cache-hit=false on a miss for backend '$BACKEND', got '$CACHE_HIT'"
             exit 1
           fi

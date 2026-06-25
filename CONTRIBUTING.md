@@ -59,7 +59,7 @@ The actions follow the composite action pattern:
 - Wrap external actions with pinned SHA versions for security
 - Accept configurable inputs with sensible defaults
 - Use environment variables for sensitive data (tokens)
-- Select the cache backend with the `cache_backend` input, and pass `s3_credentials` as a single JSON object input when using the `s3` backend. Both actions require an explicit value: `setup-mise` accepts `s3` | `github` | `none` (use `none` to install tools without caching), while `cache-go` accepts only `s3` | `github`, since caching is its only job and `none` would be a no-op
+- Select the cache backend with the `cache-backend` input, and pass `s3-credentials` as a single JSON object input when using the `s3` backend. Both actions require an explicit value: `setup-mise` accepts `s3` | `github` | `none` (use `none` to install tools without caching), while `cache-go` accepts only `s3` | `github`, since caching is its only job and `none` would be a no-op
 
 ## Dependencies
 

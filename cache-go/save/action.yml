@@ -3,15 +3,15 @@ name: "cache-go - save"
 description: "Saves the Go module and build caches to the configured backend (s3 or github)."
 
 inputs:
-  cache_backend:
+  cache-backend:
     description: |
       Which cache backend to use: "s3" or "github".
 
-      Required. When set to "s3", s3_credentials is required.
+      Required. When set to "s3", s3-credentials is required.
     required: true
-  s3_credentials:
+  s3-credentials:
     description: |
-      The S3 credentials as a JSON object. Required when cache_backend is "s3".
+      The S3 credentials as a JSON object. Required when cache-backend is "s3".
       Must contain the following keys:
 
       - endpoint (no URL scheme)
@@ -21,7 +21,7 @@ inputs:
     default: ""
   name:
     default: "default"
-  dependency_path:
+  dependency-path:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
 runs:
@@ -30,19 +30,19 @@ runs:
     - name: "Validate cache configuration"
       shell: "bash"
       env:
-        CACHE_BACKEND: "${{ inputs.cache_backend }}"
-        S3_CREDENTIALS: "${{ inputs.s3_credentials }}"
+        CACHE_BACKEND: "${{ inputs.cache-backend }}"
+        S3_CREDENTIALS: "${{ inputs.s3-credentials }}"
       run: |
         case "$CACHE_BACKEND" in
           s3)
             if [ -z "$S3_CREDENTIALS" ]; then
-              echo "::error::cache_backend is 's3' but s3_credentials was not provided"
+              echo "::error::cache-backend is 's3' but s3-credentials was not provided"
               exit 1
             fi
             ;;
           github) ;;
           *)
-            echo "::error::invalid cache_backend '$CACHE_BACKEND' (expected: s3 or github)"
+            echo "::error::invalid cache-backend '$CACHE_BACKEND' (expected: s3 or github)"
             exit 1
             ;;
         esac
@@ -52,18 +52,18 @@ runs:
       shell: "bash"
       env:
         CACHE_NAME: "${{ inputs.name }}"
-        DEP_HASH: "${{ hashFiles(inputs.dependency_path == '' && 'go.sum' || inputs.dependency_path) }}"
+        DEP_HASH: "${{ hashFiles(inputs.dependency-path == '' && 'go.sum' || inputs.dependency-path) }}"
       run: |
         bash "${{ github.action_path }}/../internal/go-cache-config.sh"
 
     - name: "Cache go (S3)"
-      if: "inputs.cache_backend == 's3'"
+      if: "inputs.cache-backend == 's3'"
       uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
       with:
-        endpoint: "${{ fromJson(inputs.s3_credentials).endpoint }}"
-        accessKey: "${{ fromJson(inputs.s3_credentials).access_key }}"
-        secretKey: "${{ fromJson(inputs.s3_credentials).secret_key }}"
-        bucket: "${{ fromJson(inputs.s3_credentials).bucket_name }}"
+        endpoint: "${{ fromJson(inputs.s3-credentials).endpoint }}"
+        accessKey: "${{ fromJson(inputs.s3-credentials).access_key }}"
+        secretKey: "${{ fromJson(inputs.s3-credentials).secret_key }}"
+        bucket: "${{ fromJson(inputs.s3-credentials).bucket_name }}"
         use-fallback: false
         key: "${{ steps.go-cache.outputs.key }}"
         path: |
@@ -71,7 +71,7 @@ runs:
           ${{ steps.go-cache.outputs.build_cache }}
 
     - name: "Cache go (GitHub)"
-      if: "inputs.cache_backend == 'github'"
+      if: "inputs.cache-backend == 'github'"
       uses: "actions/cache/save@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
       with:
         key: "${{ steps.go-cache.outputs.key }}"

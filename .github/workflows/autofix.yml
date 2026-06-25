@@ -8,8 +8,8 @@ on:
     branches: ["main"]
 
 jobs:
-  prettier:
-    name: "prettier"
+  lint:
+    name: "lint"
     runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
     env:
       S3_CREDENTIALS: >-
@@ -18,14 +18,21 @@ jobs:
     steps:
       - uses: "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0" # v7.0.0
 
-      - uses: "bckground/actions/setup-mise@main"
+      - uses: "./setup-mise"
         with:
-          cache_backend: "github"
-          s3_credentials: "${{ env.S3_CREDENTIALS }}"
+          cache-backend: "github"
+          s3-credentials: "${{ env.S3_CREDENTIALS }}"
 
       - name: "Run prettier"
         run: |
           prettier --config .prettierrc.yml --write "**/*.{yml,yaml,md,markdown,json,jsonc}"
+
+      - name: "Run shellcheck"
+        run: |
+          fixes="$(shellcheck --format=diff cache-go/internal/*.sh || true)"
+          if [ -n "$fixes" ]; then
+            printf '%s\n' "$fixes" | git apply
+          fi
 
       - name: "Run autofix"
         uses: "autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a"

@@ -23,5 +23,5 @@ jobs:
     steps:
       - uses: "bckground/actions/cla-check@main"
         with:
-          github_token: "${{ secrets.GITHUB_TOKEN }}"
-          cla_assistant_token: "${{ secrets.CLA_ASSISTANT_ACCESS_TOKEN }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          cla-assistant-token: "${{ secrets.CLA_ASSISTANT_ACCESS_TOKEN }}"
