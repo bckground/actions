@@ -26,12 +26,29 @@ inputs:
 
 outputs:
   cache-hit:
-    # actions/cache (and the s3 fork) leave cache-hit unset (empty) on a total
-    # miss and only set 'false' on a restore-key match, so coerce to a strict
-    # 'true'/'false' boolean. The parentheses are required: '==' binds tighter
-    # than '||', so without them the comparison would only apply to the github
-    # output.
+    description: |
+      "true" only when the primary cache key was an exact match; "false" for a
+      restore-key match or a total miss. See cache-match to tell those apart.
+    # cache-hit is 'true' only on an exact primary-key match; every other case
+    # (a restore-key match or a total miss) is non-'true', so '== true' coerces
+    # it to a strict 'true'/'false' string (action outputs are always strings).
+    # The parentheses are required: '==' binds tighter than '||', so without
+    # them the comparison would only apply to the github output.
     value: ${{ (steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit) == 'true' }}
+  cache-match:
+    description: |
+      How the cache was matched: "exact" (primary key hit), "partial" (only a
+      restore-key matched), or "none" (no match at all).
+    # 'exact' when cache-hit is 'true'. Otherwise 'partial' if a cache was
+    # restored at all and 'none' if not: cache-matched-key holds the restored
+    # cache's key and is empty only on a total miss (documented for both
+    # backends), so it splits 'partial' from 'none' without relying on whether
+    # cache-hit is '' or 'false' on a miss. Exactly one backend step runs, so
+    # each '||' selects the active backend's value.
+    value: >-
+      ${{ (steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit) == 'true' && 'exact'
+      || (steps.restore-go-caches-s3.outputs.cache-matched-key || steps.restore-go-caches-github.outputs.cache-matched-key) != '' && 'partial'
+      || 'none' }}
 
 runs:
   using: "composite"

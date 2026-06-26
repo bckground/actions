@@ -152,9 +152,14 @@ jobs:
         env:
           BACKEND: "${{ matrix.backend }}"
           CACHE_HIT: "${{ steps.restore.outputs.cache-hit }}"
+          CACHE_MATCH: "${{ steps.restore.outputs.cache-match }}"
         run: |
           if [ "$CACHE_HIT" != "true" ]; then
             echo "::error::expected cache-hit=true for backend '$BACKEND', got '$CACHE_HIT'"
+            exit 1
+          fi
+          if [ "$CACHE_MATCH" != "exact" ]; then
+            echo "::error::expected cache-match=exact for backend '$BACKEND', got '$CACHE_MATCH'"
             exit 1
           fi
 
@@ -172,8 +177,38 @@ jobs:
         env:
           BACKEND: "${{ matrix.backend }}"
           CACHE_HIT: "${{ steps.restore-miss.outputs.cache-hit }}"
+          CACHE_MATCH: "${{ steps.restore-miss.outputs.cache-match }}"
         run: |
           if [ "$CACHE_HIT" != "false" ]; then
             echo "::error::expected cache-hit=false on a miss for backend '$BACKEND', got '$CACHE_HIT'"
+            exit 1
+          fi
+          if [ "$CACHE_MATCH" != "none" ]; then
+            echo "::error::expected cache-match=none on a miss for backend '$BACKEND', got '$CACHE_MATCH'"
+            exit 1
+          fi
+
+      - name: "Restore with a different dependency hash"
+        id: "restore-partial"
+        uses: "./cache-go/restore"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.mod"
+
+      - name: "Assert restore-key (partial) match"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          CACHE_HIT: "${{ steps.restore-partial.outputs.cache-hit }}"
+          CACHE_MATCH: "${{ steps.restore-partial.outputs.cache-match }}"
+        run: |
+          if [ "$CACHE_HIT" != "false" ]; then
+            echo "::error::expected cache-hit=false on a partial match for backend '$BACKEND', got '$CACHE_HIT'"
+            exit 1
+          fi
+          if [ "$CACHE_MATCH" != "partial" ]; then
+            echo "::error::expected cache-match=partial for backend '$BACKEND', got '$CACHE_MATCH'"
             exit 1
           fi
