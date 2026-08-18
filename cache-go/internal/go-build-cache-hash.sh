@@ -4,18 +4,28 @@
 # the Go build cache, which cache-go/save turns into the build cache key and
 # uses to skip the upload when nothing changed since cache-go/restore ran.
 #
-# Only the "-a" index entries are hashed. Each one holds a single record:
+# The fingerprint is the sorted list of output file ("-d") names, hashed. Each
+# output is named after the sha256 of its own contents, so the list of names
+# describes exactly what the cache holds - without reading a single file.
+#
+# The index records ("-a") are deliberately left out. Each one maps an action
+# to the output it produced:
 #
 #   v1 <actionID> <outputID> <size> <unixnano>
 #
-# Fields 1-4 are what the cache actually knows: which build inputs produce which
-# output, and how big it is. Field 5 is a timestamp Go rewrites on every put, so
-# including it would change the fingerprint on every run and defeat the purpose.
-# The "-d" blobs need no reading either: each is named after the hash of its own
-# contents and is referenced by a record, so the records already cover them.
+# and some actionIDs - the per-directory source indexes - hash in file mtimes.
+# A CI checkout rewrites every mtime, so runs that built nothing new kept
+# minting fresh records for outputs the cache already held, and the
+# fingerprint changed every run: save never got to skip. Records can also
+# misdescribe the cache in ways output names cannot: one can point at an
+# output that is gone (the two files are written - and trimmed - separately),
+# and stale ones linger for days after mtime churn replaces them.
 #
-# Hashing the records rather than every byte also keeps this cheap. On a 161G
-# cache with ~240k entries the two differ by three orders of magnitude.
+# The trade-off: a run that only adds new records for existing outputs reads
+# as unchanged and is not re-uploaded, so the next run re-derives those
+# records. That is precisely the mtime-churn case, and re-indexing costs
+# milliseconds; work that produces genuinely new bytes always changes the
+# fingerprint.
 #
 # It is invoked via ${{ github.action_path }}/../internal/go-build-cache-hash.sh
 # so that restore and save always run the helper at the same ref they were
@@ -38,10 +48,8 @@ fi
 cd "$build_cache" || exit 1
 
 # -mindepth 2 skips the cache root, which holds only README and trim.txt; the
-# entries themselves live one level down in the shard directories. Each record
-# carries its own actionID, so sorting the emitted lines is enough to be
-# deterministic - the file list needs no sorting of its own.
-find . -mindepth 2 -name '*-a' -type f -exec awk '{print $1, $2, $3, $4}' {} + \
+# outputs themselves live one level down in the shard directories.
+find . -mindepth 2 -name '*-d' -type f \
   | LC_ALL=C sort \
   | sha256sum \
   | cut -d' ' -f1

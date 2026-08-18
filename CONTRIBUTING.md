@@ -14,7 +14,7 @@ The repository follows GitHub Actions composite action patterns:
   - `restore/` - Restores the Go module and build caches, and records in `$GITHUB_ENV` what `save` can skip: the restored build cache's fingerprint, and the module cache key when it was an exact match
   - `save/` - Saves the Go module and build caches, skipping either upload when it would store nothing: the build cache when its fingerprint is unchanged since `restore` ran, the module cache when `restore` matched its key exactly. Neither backend reports whether it actually stored anything, so this is decided here rather than left to them. It makes `cache-go` a once-per-job action, which it must be anyway since a runner has a single build cache directory
   - `internal/go-cache-config.sh` - Shared script that resolves the Go configuration and emits every cache key, so no key is ever assembled in an `action.yml`. `restore` and `save` invoke it via `github.action_path`, so both run it at the same ref. It emits `build-key` only when given a `BUILD_HASH`, which only `save` has
-  - `internal/go-build-cache-hash.sh` - Shared script that fingerprints the build cache, invoked the same way. It hashes only the `-a` index records, and only their first four fields, since the fifth is a timestamp Go rewrites on every put. It takes no input and resolves `GOCACHE` itself, so `save` can run it before `go-cache-config.sh`, which needs its output to build `build-key`
+  - `internal/go-build-cache-hash.sh` - Shared script that fingerprints the build cache, invoked the same way. It hashes the sorted list of output file (`-d`) names: each output is named after the hash of its own contents, so the list describes exactly what the cache holds. The `-a` index records are deliberately left out, since some of their keys embed source file mtimes, which a CI checkout rewrites on every run - hashing them re-uploaded caches whose contents had not changed. It takes no input and resolves `GOCACHE` itself, so `save` can run it before `go-cache-config.sh`, which needs its output to build `build-key`
 - Each action directory contains:
   - `action.yml` - Action definition with inputs, outputs, and steps
   - Composite actions that wrap external actions with organization-specific defaults
@@ -49,7 +49,7 @@ shellcheck cache-go/internal/*.sh
 
 Beyond the linting and formatting above, behavior is validated through:
 
-1. The `test` workflow, which exercises the validation guard, `setup-mise`, and the `cache-go` save/restore round-trip - including that neither cache is re-uploaded when it would store nothing, and that a source change re-saves only the build cache - across the `github` and `s3` backends (the `s3` jobs run only when their secrets are available). It uses a minimal Go module fixture under `_test/fixtures/go`.
+1. The `test` workflow, which exercises the validation guard, `setup-mise`, and the `cache-go` save/restore round-trip - including that neither cache is re-uploaded when it would store nothing (even after a rebuild where only file mtimes changed), and that a source change re-saves only the build cache - across the `github` and `s3` backends (the `s3` jobs run only when their secrets are available). It uses a minimal Go module fixture under `_test/fixtures/go`.
 2. Using the actions in other repositories
 
 ## Action Usage Patterns
