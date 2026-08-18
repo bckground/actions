@@ -136,7 +136,7 @@ runs:
     - name: "Restore mise cache (GitHub)"
       if: "inputs.cache-backend == 'github'"
       id: "restore-mise-cache-github"
-      uses: "actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
       with:
         key: "${{ steps.cache-keys.outputs.key }}"
         restore-keys: |
@@ -145,7 +145,7 @@ runs:
           ${{ steps.mise-config.outputs.data_dir }}
 
     - name: "Set up mise"
-      uses: "jdx/mise-action@1648a7812b9aeae629881980618f079932869151" # v4.0.1
+      uses: "jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518" # v4.2.5
       env:
         MISE_ENV: "${{ inputs.mise-envs }}"
       with:
@@ -178,7 +178,7 @@ runs:
           ${{ steps.mise-config.outputs.data_dir }}
 
     - name: "Save mise cache (GitHub)"
-      uses: "actions/cache/save@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      uses: "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
       if: "inputs.cache-backend == 'github' && steps.restore-mise-cache-github.outputs.cache-hit != 'true'"
       with:
         key: "${{ steps.cache-keys.outputs.key }}"
