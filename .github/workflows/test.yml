@@ -131,12 +131,32 @@ jobs:
           go build -o /dev/null .
 
       - name: "Save go caches"
+        id: "save-first"
         uses: "./cache-go/save"
         with:
           cache-backend: "${{ matrix.backend }}"
           s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
           name: "ci-cache-go-test"
           dependency-path: "_test/fixtures/go/go.sum"
+
+      # No restore ran before this save, so neither cache can be skipped.
+      - name: "Assert the first save stores both caches"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          MOD_SAVED: "${{ steps.save-first.outputs.mod-cache-saved }}"
+          BUILD_SAVED: "${{ steps.save-first.outputs.build-cache-saved }}"
+        run: |
+          fail=0
+          if [ "$MOD_SAVED" != "true" ]; then
+            echo "::error::expected mod-cache-saved=true on the first save for backend , got "
+            fail=1
+          fi
+          if [ "$BUILD_SAVED" != "true" ]; then
+            echo "::error::expected build-cache-saved=true on the first save for backend , got "
+            fail=1
+          fi
+          exit "$fail"
 
       - name: "Restore go caches"
         id: "restore"
@@ -147,19 +167,117 @@ jobs:
           name: "ci-cache-go-test"
           dependency-path: "_test/fixtures/go/go.sum"
 
+      # The module cache is keyed on go.sum, so it matches exactly. The build
+      # cache is keyed on a fingerprint of its own contents, which is unknowable
+      # before the restore, so it is always found through its restore-key and
+      # "partial" is the success case.
       - name: "Assert cache hit"
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          CACHE_HIT: "${{ steps.restore.outputs.cache-hit }}"
-          CACHE_MATCH: "${{ steps.restore.outputs.cache-match }}"
+          MOD_HIT: "${{ steps.restore.outputs.mod-cache-hit }}"
+          MOD_MATCH: "${{ steps.restore.outputs.mod-cache-match }}"
+          BUILD_MATCH: "${{ steps.restore.outputs.build-cache-match }}"
         run: |
-          if [ "$CACHE_HIT" != "true" ]; then
-            echo "::error::expected cache-hit=true for backend '$BACKEND', got '$CACHE_HIT'"
-            exit 1
+          fail=0
+          if [ "$MOD_HIT" != "true" ]; then
+            echo "::error::expected mod-cache-hit=true for backend '$BACKEND', got '$MOD_HIT'"
+            fail=1
           fi
-          if [ "$CACHE_MATCH" != "exact" ]; then
-            echo "::error::expected cache-match=exact for backend '$BACKEND', got '$CACHE_MATCH'"
+          if [ "$MOD_MATCH" != "exact" ]; then
+            echo "::error::expected mod-cache-match=exact for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
+          fi
+          if [ "$BUILD_MATCH" != "partial" ]; then
+            echo "::error::expected build-cache-match=partial for backend '$BACKEND', got '$BUILD_MATCH'"
+            fail=1
+          fi
+          exit "$fail"
+
+      # Nothing was built since the restore above, so the build cache is what
+      # was restored and must not be uploaded again.
+      - name: "Save go caches again without rebuilding"
+        id: "save-unchanged"
+        uses: "./cache-go/save"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      # The restore above matched the module cache exactly and nothing was built
+      # since, so neither cache has anything new to store.
+      - name: "Assert an unchanged save stores nothing"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          MOD_SAVED: "${{ steps.save-unchanged.outputs.mod-cache-saved }}"
+          BUILD_SAVED: "${{ steps.save-unchanged.outputs.build-cache-saved }}"
+        run: |
+          fail=0
+          if [ "$MOD_SAVED" != "false" ]; then
+            echo "::error::expected mod-cache-saved=false for an unchanged cache on backend '$BACKEND', got '$MOD_SAVED'"
+            fail=1
+          fi
+          if [ "$BUILD_SAVED" != "false" ]; then
+            echo "::error::expected build-cache-saved=false for an unchanged cache on backend '$BACKEND', got '$BUILD_SAVED'"
+            fail=1
+          fi
+          exit "$fail"
+
+      - name: "Rebuild the fixture after a source change"
+        working-directory: "_test/fixtures/go"
+        env:
+          MARKER: "${{ github.run_id }}-${{ github.run_attempt }}"
+        run: |
+          printf '\nvar cacheGoTestMarker = "%s"\n' "$MARKER" >> main.go
+          go build -o /dev/null .
+
+      - name: "Save go caches after the rebuild"
+        id: "save-changed"
+        uses: "./cache-go/save"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      # The two caches are keyed independently: a source change invalidates the
+      # build cache but leaves go.sum, and therefore the module cache, alone.
+      - name: "Assert only the build cache is saved after a rebuild"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          MOD_SAVED: "${{ steps.save-changed.outputs.mod-cache-saved }}"
+          BUILD_SAVED: "${{ steps.save-changed.outputs.build-cache-saved }}"
+        run: |
+          fail=0
+          if [ "$BUILD_SAVED" != "true" ]; then
+            echo "::error::expected build-cache-saved=true after a rebuild on backend '$BACKEND', got '$BUILD_SAVED'"
+            fail=1
+          fi
+          if [ "$MOD_SAVED" != "false" ]; then
+            echo "::error::expected mod-cache-saved=false after a rebuild on backend '$BACKEND', got '$MOD_SAVED'"
+            fail=1
+          fi
+          exit "$fail"
+      - name: "Restore the rebuilt caches"
+        id: "restore-rebuilt"
+        uses: "./cache-go/restore"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      - name: "Assert the rebuilt build cache is picked up"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          BUILD_MATCH: "${{ steps.restore-rebuilt.outputs.build-cache-match }}"
+        run: |
+          if [ "$BUILD_MATCH" != "partial" ]; then
+            echo "::error::expected build-cache-match=partial after a rebuild on backend '$BACKEND', got '$BUILD_MATCH'"
             exit 1
           fi
 
@@ -176,18 +294,27 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          CACHE_HIT: "${{ steps.restore-miss.outputs.cache-hit }}"
-          CACHE_MATCH: "${{ steps.restore-miss.outputs.cache-match }}"
+          MOD_HIT: "${{ steps.restore-miss.outputs.mod-cache-hit }}"
+          MOD_MATCH: "${{ steps.restore-miss.outputs.mod-cache-match }}"
+          BUILD_MATCH: "${{ steps.restore-miss.outputs.build-cache-match }}"
         run: |
-          if [ "$CACHE_HIT" != "false" ]; then
-            echo "::error::expected cache-hit=false on a miss for backend '$BACKEND', got '$CACHE_HIT'"
-            exit 1
+          fail=0
+          if [ "$MOD_HIT" != "false" ]; then
+            echo "::error::expected mod-cache-hit=false on a miss for backend '$BACKEND', got '$MOD_HIT'"
+            fail=1
           fi
-          if [ "$CACHE_MATCH" != "none" ]; then
-            echo "::error::expected cache-match=none on a miss for backend '$BACKEND', got '$CACHE_MATCH'"
-            exit 1
+          if [ "$MOD_MATCH" != "none" ]; then
+            echo "::error::expected mod-cache-match=none on a miss for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
           fi
+          if [ "$BUILD_MATCH" != "none" ]; then
+            echo "::error::expected build-cache-match=none on a miss for backend '$BACKEND', got '$BUILD_MATCH'"
+            fail=1
+          fi
+          exit "$fail"
 
+      # A different dependency file yields a different hash, so only the module
+      # cache's restore-key can match.
       - name: "Restore with a different dependency hash"
         id: "restore-partial"
         uses: "./cache-go/restore"
@@ -201,14 +328,16 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          CACHE_HIT: "${{ steps.restore-partial.outputs.cache-hit }}"
-          CACHE_MATCH: "${{ steps.restore-partial.outputs.cache-match }}"
+          MOD_HIT: "${{ steps.restore-partial.outputs.mod-cache-hit }}"
+          MOD_MATCH: "${{ steps.restore-partial.outputs.mod-cache-match }}"
         run: |
-          if [ "$CACHE_HIT" != "false" ]; then
-            echo "::error::expected cache-hit=false on a partial match for backend '$BACKEND', got '$CACHE_HIT'"
-            exit 1
+          fail=0
+          if [ "$MOD_HIT" != "false" ]; then
+            echo "::error::expected mod-cache-hit=false on a partial match for backend '$BACKEND', got '$MOD_HIT'"
+            fail=1
           fi
-          if [ "$CACHE_MATCH" != "partial" ]; then
-            echo "::error::expected cache-match=partial for backend '$BACKEND', got '$CACHE_MATCH'"
-            exit 1
+          if [ "$MOD_MATCH" != "partial" ]; then
+            echo "::error::expected mod-cache-match=partial for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
           fi
+          exit "$fail"

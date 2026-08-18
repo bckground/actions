@@ -25,20 +25,21 @@ inputs:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
 outputs:
-  cache-hit:
+  mod-cache-hit:
     description: |
-      "true" only when the primary cache key was an exact match; "false" for a
-      restore-key match or a total miss. See cache-match to tell those apart.
+      "true" only when the module cache's primary key was an exact match;
+      "false" for a restore-key match or a total miss. See mod-cache-match to
+      tell those apart.
     # cache-hit is 'true' only on an exact primary-key match; every other case
     # (a restore-key match or a total miss) is non-'true', so '== true' coerces
     # it to a strict 'true'/'false' string (action outputs are always strings).
     # The parentheses are required: '==' binds tighter than '||', so without
     # them the comparison would only apply to the github output.
-    value: ${{ (steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit) == 'true' }}
-  cache-match:
+    value: ${{ (steps.restore-mod-s3.outputs.cache-hit || steps.restore-mod-github.outputs.cache-hit) == 'true' }}
+  mod-cache-match:
     description: |
-      How the cache was matched: "exact" (primary key hit), "partial" (only a
-      restore-key matched), or "none" (no match at all).
+      How the module cache was matched: "exact" (primary key hit), "partial"
+      (only a restore-key matched), or "none" (no match at all).
     # 'exact' when cache-hit is 'true'. Otherwise 'partial' if a cache was
     # restored at all and 'none' if not: cache-matched-key holds the restored
     # cache's key and is empty only on a total miss (documented for both
@@ -46,14 +47,27 @@ outputs:
     # cache-hit is '' or 'false' on a miss. Exactly one backend step runs, so
     # each '||' selects the active backend's value.
     value: >-
-      ${{ (steps.restore-go-caches-s3.outputs.cache-hit || steps.restore-go-caches-github.outputs.cache-hit) == 'true' && 'exact'
-      || (steps.restore-go-caches-s3.outputs.cache-matched-key || steps.restore-go-caches-github.outputs.cache-matched-key) != '' && 'partial'
+      ${{ (steps.restore-mod-s3.outputs.cache-hit || steps.restore-mod-github.outputs.cache-hit) == 'true' && 'exact'
+      || (steps.restore-mod-s3.outputs.cache-matched-key || steps.restore-mod-github.outputs.cache-matched-key) != '' && 'partial'
+      || 'none' }}
+  build-cache-match:
+    description: |
+      How the build cache was matched: "partial" (a restore-key matched) or
+      "none" (no match at all).
+
+      There is deliberately no "exact" and no build-cache-hit: the build cache
+      is keyed on a fingerprint of its own contents, which cannot be known
+      before it is restored, so it is always matched through its restore-key.
+    # Only cache-matched-key can tell a restore-key match from a total miss
+    # here, since cache-hit is never 'true' for a prefix-only lookup.
+    value: >-
+      ${{ (steps.restore-build-s3.outputs.cache-matched-key || steps.restore-build-github.outputs.cache-matched-key) != '' && 'partial'
       || 'none' }}
 
 runs:
   using: "composite"
   steps:
-    - name: "Validate cache configuration"
+    - name: "Validate the cache backend configuration"
       shell: "bash"
       env:
         CACHE_BACKEND: "${{ inputs.cache-backend }}"
@@ -87,31 +101,83 @@ runs:
       run: |
         go clean -cache -modcache
 
-    - id: "restore-go-caches-s3"
-      name: "Restore go caches (S3)"
+    - id: "restore-mod-s3"
+      name: "Restore go module cache (S3)"
       if: "inputs.cache-backend == 's3'"
-      uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
+      uses: "tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
       with:
         endpoint: ${{ fromJson(inputs.s3-credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3-credentials).access_key }}
         secretKey: ${{ fromJson(inputs.s3-credentials).secret_key }}
         bucket: ${{ fromJson(inputs.s3-credentials).bucket_name }}
         use-fallback: false
-        key: "${{ steps.go-cache.outputs.key }}"
+        key: "${{ steps.go-cache.outputs.mod-key }}"
         restore-keys: |
-          ${{ steps.go-cache.outputs.restore-key }}
+          ${{ steps.go-cache.outputs.mod-restore-key }}
         path: |
           ${{ steps.go-cache.outputs.mod_cache }}
-          ${{ steps.go-cache.outputs.build_cache }}
 
-    - id: "restore-go-caches-github"
-      name: "Restore go caches (GitHub)"
+    - id: "restore-mod-github"
+      name: "Restore go module cache (GitHub)"
       if: "inputs.cache-backend == 'github'"
       uses: "actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
       with:
-        key: "${{ steps.go-cache.outputs.key }}"
+        key: "${{ steps.go-cache.outputs.mod-key }}"
         restore-keys: |
-          ${{ steps.go-cache.outputs.restore-key }}
+          ${{ steps.go-cache.outputs.mod-restore-key }}
         path: |
           ${{ steps.go-cache.outputs.mod_cache }}
+
+    # The build cache is keyed on a fingerprint of its own contents, which is
+    # unknowable until it has been restored, so there is no primary key to look
+    # up. Passing build-restore-key as the key too is deliberate: saved keys are
+    # always prefix+fingerprint, so the prefix alone can never match one, and
+    # the lookup falls through to the restore-key - which returns the most
+    # recently saved build cache for this scope.
+    - id: "restore-build-s3"
+      name: "Restore go build cache (S3)"
+      if: "inputs.cache-backend == 's3'"
+      uses: "tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
+      with:
+        endpoint: ${{ fromJson(inputs.s3-credentials).endpoint }}
+        accessKey: ${{ fromJson(inputs.s3-credentials).access_key }}
+        secretKey: ${{ fromJson(inputs.s3-credentials).secret_key }}
+        bucket: ${{ fromJson(inputs.s3-credentials).bucket_name }}
+        use-fallback: false
+        key: "${{ steps.go-cache.outputs.build-restore-key }}"
+        restore-keys: |
+          ${{ steps.go-cache.outputs.build-restore-key }}
+        path: |
           ${{ steps.go-cache.outputs.build_cache }}
+
+    - id: "restore-build-github"
+      name: "Restore go build cache (GitHub)"
+      if: "inputs.cache-backend == 'github'"
+      uses: "actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      with:
+        key: "${{ steps.go-cache.outputs.build-restore-key }}"
+        restore-keys: |
+          ${{ steps.go-cache.outputs.build-restore-key }}
+        path: |
+          ${{ steps.go-cache.outputs.build_cache }}
+
+    # Hand cache-go/save what it needs to skip uploads that would store nothing.
+    # GITHUB_ENV is job-wide, so this assumes cache-go is used once per job -
+    # which it must be anyway, since a runner has a single build cache
+    # directory.
+    - name: "Record what cache-go/save can skip"
+      shell: "bash"
+      env:
+        # The module cache is keyed on the dependency hash, so an exact match
+        # means the backend already holds this exact key and saving it again
+        # would store nothing. Left empty in every other case, which is never a
+        # valid key, so save always uploads then.
+        MOD_KEY_ALREADY_SAVED: >-
+          ${{ (steps.restore-mod-s3.outputs.cache-hit || steps.restore-mod-github.outputs.cache-hit) == 'true'
+          && steps.go-cache.outputs.mod-key || '' }}
+      run: |
+        build_hash="$(bash "${{ github.action_path }}/../internal/go-build-cache-hash.sh")"
+        {
+          echo "CACHE_GO_BUILD_HASH=${build_hash}"
+          echo "CACHE_GO_MOD_KEY=${MOD_KEY_ALREADY_SAVED}"
+        } | tee -a "$GITHUB_ENV"

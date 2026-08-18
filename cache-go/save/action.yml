@@ -24,10 +24,24 @@ inputs:
   dependency-path:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
+outputs:
+  mod-cache-saved:
+    description: |
+      "true" when the module cache was handed to the backend, "false" when the
+      upload was skipped because cache-go/restore had already matched this exact
+      key, so the backend holds it and saving would store nothing.
+    value: "${{ steps.plan.outputs.save-mod }}"
+  build-cache-saved:
+    description: |
+      "true" when the build cache was handed to the backend, "false" when the
+      upload was skipped because the cache had not changed since
+      cache-go/restore ran.
+    value: "${{ steps.plan.outputs.save-build }}"
+
 runs:
   using: "composite"
   steps:
-    - name: "Validate cache configuration"
+    - name: "Validate the cache backend configuration"
       shell: "bash"
       env:
         CACHE_BACKEND: "${{ inputs.cache-backend }}"
@@ -47,34 +61,96 @@ runs:
             ;;
         esac
 
+    # Runs before the configuration is resolved because the build cache key is
+    # built from this fingerprint.
+    - name: "Fingerprint the build cache"
+      id: "build-hash"
+      shell: "bash"
+      run: |
+        hash="$(bash "${{ github.action_path }}/../internal/go-build-cache-hash.sh")"
+        echo "hash=${hash}" | tee -a "$GITHUB_OUTPUT"
+
     - name: "Resolve go cache configuration"
       id: "go-cache"
       shell: "bash"
       env:
         CACHE_NAME: "${{ inputs.name }}"
         DEP_HASH: "${{ hashFiles(inputs.dependency-path == '' && 'go.sum' || inputs.dependency-path) }}"
+        BUILD_HASH: "${{ steps.build-hash.outputs.hash }}"
       run: |
         bash "${{ github.action_path }}/../internal/go-cache-config.sh"
 
-    - name: "Cache go (S3)"
-      if: "inputs.cache-backend == 's3'"
-      uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
+    # Neither backend reports whether it stored anything, and neither refuses an
+    # upload cheaply, so skipping a redundant save has to be decided here. Both
+    # comparisons are against values cache-go/restore recorded, and both fall
+    # through to saving when it did not run in this job.
+    - name: "Decide what needs saving"
+      id: "plan"
+      shell: "bash"
+      env:
+        MOD_KEY: "${{ steps.go-cache.outputs.mod-key }}"
+        BUILD_HASH: "${{ steps.build-hash.outputs.hash }}"
+      run: |
+        if [ "$BUILD_HASH" = "${CACHE_GO_BUILD_HASH:-}" ]; then
+          save_build="false"
+          echo "build cache unchanged since restore; skipping its upload"
+        else
+          save_build="true"
+        fi
+
+        # CACHE_GO_MOD_KEY holds the module cache key only when restore matched
+        # it exactly. It is empty otherwise, and MOD_KEY is never empty, so the
+        # two can only be equal on a genuine match.
+        if [ "$MOD_KEY" = "${CACHE_GO_MOD_KEY:-}" ]; then
+          save_mod="false"
+          echo "module cache key '$MOD_KEY' already in the backend; skipping its upload"
+        else
+          save_mod="true"
+        fi
+
+        {
+          echo "save-build=${save_build}"
+          echo "save-mod=${save_mod}"
+        } | tee -a "$GITHUB_OUTPUT"
+
+    - name: "Cache go modules (S3)"
+      if: "inputs.cache-backend == 's3' && steps.plan.outputs.save-mod == 'true'"
+      uses: "tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
       with:
         endpoint: "${{ fromJson(inputs.s3-credentials).endpoint }}"
         accessKey: "${{ fromJson(inputs.s3-credentials).access_key }}"
         secretKey: "${{ fromJson(inputs.s3-credentials).secret_key }}"
         bucket: "${{ fromJson(inputs.s3-credentials).bucket_name }}"
         use-fallback: false
-        key: "${{ steps.go-cache.outputs.key }}"
+        key: "${{ steps.go-cache.outputs.mod-key }}"
         path: |
           ${{ steps.go-cache.outputs.mod_cache }}
-          ${{ steps.go-cache.outputs.build_cache }}
 
-    - name: "Cache go (GitHub)"
-      if: "inputs.cache-backend == 'github'"
+    - name: "Cache go modules (GitHub)"
+      if: "inputs.cache-backend == 'github' && steps.plan.outputs.save-mod == 'true'"
       uses: "actions/cache/save@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
       with:
-        key: "${{ steps.go-cache.outputs.key }}"
+        key: "${{ steps.go-cache.outputs.mod-key }}"
         path: |
           ${{ steps.go-cache.outputs.mod_cache }}
+
+    - name: "Cache go build (S3)"
+      if: "inputs.cache-backend == 's3' && steps.plan.outputs.save-build == 'true'"
+      uses: "tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
+      with:
+        endpoint: "${{ fromJson(inputs.s3-credentials).endpoint }}"
+        accessKey: "${{ fromJson(inputs.s3-credentials).access_key }}"
+        secretKey: "${{ fromJson(inputs.s3-credentials).secret_key }}"
+        bucket: "${{ fromJson(inputs.s3-credentials).bucket_name }}"
+        use-fallback: false
+        key: "${{ steps.go-cache.outputs.build-key }}"
+        path: |
+          ${{ steps.go-cache.outputs.build_cache }}
+
+    - name: "Cache go build (GitHub)"
+      if: "inputs.cache-backend == 'github' && steps.plan.outputs.save-build == 'true'"
+      uses: "actions/cache/save@2c8a9bd7457de244a408f35966fab2fb45fda9c8" # v6.0.0
+      with:
+        key: "${{ steps.go-cache.outputs.build-key }}"
+        path: |
           ${{ steps.go-cache.outputs.build_cache }}
