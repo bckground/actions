@@ -3,9 +3,17 @@ version: 2
 #
 # schedule.interval does NOT apply to security updates. dependabot creates PRs
 # for security updates ASAP.
+#
+# The "github-actions" ecosystem only scans the directories it is pointed at:
+# "/" covers .github/workflows, and each action directory must be listed so the
+# actions pinned inside its action.yml are updated too.
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/cla-check"
+      - "/setup-mise"
+      - "/cache-go/restore"
+      - "/cache-go/save"
     schedule:
-      interval: "monthly"
-    labels: ["area/dependencies"]
+      interval: "weekly"
