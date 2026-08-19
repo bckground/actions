@@ -163,7 +163,7 @@ runs:
         mise prune
 
     - name: "Save mise cache (S3)"
-      uses: "tespkg/actions-cache/save@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
+      uses: "tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
       # We save the cache on a miss or a partial (restore-key) match. An exact
       # match sets cache-hit to 'true'; anything else leaves it 'false' or empty.
       if: "inputs.cache-backend == 's3' && steps.restore-mise-cache-s3.outputs.cache-hit != 'true'"
