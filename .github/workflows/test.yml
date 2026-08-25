@@ -128,10 +128,18 @@ jobs:
       # refuses to index a directory containing a file modified that recently,
       # and the mtime-churn test below needs the per-directory index to be in
       # the cache before the first save.
+      #
+      # The same cutoff applies to GOROOT, which setup-go wrote moments ago
+      # and which nothing here can backdate. Without the wait the build skips
+      # indexing whatever part of the standard library it finds too fresh,
+      # those indexes land in the cache on the next build instead, and the
+      # mtime-churn test below sees the cache grow for reasons that have
+      # nothing to do with mtime churn.
       - name: "Populate go caches"
         working-directory: "_test/fixtures/go"
         run: |
           touch -d "2001-02-03 04:05:06" ./*
+          sleep 3
           go mod download
           go build -o /dev/null .
 
