@@ -133,7 +133,8 @@ jobs:
         run: |
           touch -d "2001-02-03 04:05:06" ./*
           go mod download
-          go build -o /dev/null .
+          GODEBUG=gocachehash=1 go build -o /dev/null . 2>/tmp/hash1.txt
+          wc -l /tmp/hash1.txt
 
       - name: "Save go caches"
         id: "save-first"
@@ -250,7 +251,18 @@ jobs:
         working-directory: "_test/fixtures/go"
         run: |
           touch -d "2011-05-06 07:08:09" ./*
-          go build -v -x -o /dev/null . 2>&1 | tail -60
+          GODEBUG=gocachehash=1 go build -o /dev/null . 2>/tmp/hash2.txt
+          wc -l /tmp/hash2.txt
+
+      - name: "DEBUG diff the cache-hash inputs of the two builds"
+        shell: "bash"
+        run: |
+          echo "--- actions present in build 2 but not build 1 (by name) ---"
+          grep -o 'HASH\[[^]]*\]' /tmp/hash1.txt | LC_ALL=C sort -u > /tmp/h1-names.txt
+          grep -o 'HASH\[[^]]*\]' /tmp/hash2.txt | LC_ALL=C sort -u > /tmp/h2-names.txt
+          diff /tmp/h1-names.txt /tmp/h2-names.txt || true
+          echo "--- first 120 lines of the raw input diff ---"
+          diff /tmp/hash1.txt /tmp/hash2.txt | head -120 || true
 
       - name: "DEBUG diff the build cache after the rebuild"
         shell: "bash"
