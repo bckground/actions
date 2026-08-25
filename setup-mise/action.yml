@@ -120,7 +120,7 @@ runs:
     - name: "Restore mise cache (S3)"
       if: "inputs.cache-backend == 's3'"
       id: "restore-mise-cache-s3"
-      uses: "tespkg/actions-cache/restore@570a8ae32f67c95bcaca3f8cc88702cd318291e9" # v1.10.0
+      uses: "tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
       with:
         endpoint: ${{ fromJson(inputs.s3-credentials).endpoint }}
         accessKey: ${{ fromJson(inputs.s3-credentials).access_key }}
