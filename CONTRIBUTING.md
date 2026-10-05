@@ -66,7 +66,7 @@ The actions follow the composite action pattern:
 
 External action dependencies are pinned to specific SHA commits for security and reproducibility:
 
-- **cla-check**: `cla-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08` (v2.6.1)
+- **cla-check**: `bckground/github-action@368450fe6d411529c3ce66a5586b8f71912463ee` (fork of the archived `cla-assistant/github-action`, v2.6.1 on node24)
 - **cache-go** and **setup-mise**: `actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd` (v8.0.0) for hashing, `tespkg/actions-cache@570a8ae32f67c95bcaca3f8cc88702cd318291e9` (v1.10.0) for the `s3` cache backend, and `actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8` (v6.0.0) for the `github` cache backend
 - **setup-mise**: `jdx/mise-action@1648a7812b9aeae629881980618f079932869151` (v4.0.1)
 - **CI workflows**: `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd` (v6.0.2) and `actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16` (v6.5.0); the `lint` workflow also runs `jdx/mise-action` (above) directly
