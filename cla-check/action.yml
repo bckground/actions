@@ -15,7 +15,7 @@ runs:
   steps:
     - name: "CLA Check"
       if: "(github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'"
-      uses: "cla-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08" # v2.6.1
+      uses: "bckground/github-action@4041c048f374630f91552d6ed9f539077babc260" # feat/node24 (v2.6.1 on node24)
       env:
         GITHUB_TOKEN: "${{ inputs.github-token }}"
         PERSONAL_ACCESS_TOKEN: "${{ inputs.cla-assistant-token }}"
