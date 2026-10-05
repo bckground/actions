@@ -116,6 +116,10 @@ jobs:
       S3_CREDENTIALS: >-
         ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
         secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
+      # Blacksmith runners set GOCACHEPROG, which moves the build cache off
+      # disk and makes cache-go skip it. Clearing it lets the steps below
+      # exercise the build cache; the GOCACHEPROG path is tested at the end.
+      GOCACHEPROG: ""
     steps:
       - uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
 
@@ -123,6 +127,15 @@ jobs:
         with:
           go-version: "1.26"
           cache: false
+
+      # Guards the job-level override: an empty variable does not override a
+      # value in the go env file.
+      - name: "Assert GOCACHEPROG is disabled"
+        run: |
+          if [ -n "$(go env GOCACHEPROG)" ]; then
+            echo "::error::GOCACHEPROG is still set to '$(go env GOCACHEPROG)'"
+            exit 1
+          fi
 
       # The touch backdates the sources past Go's modTimeCutoff (2s): Go
       # refuses to index a directory containing a file modified that recently,
@@ -389,6 +402,53 @@ jobs:
           fi
           if [ "$MOD_MATCH" != "partial" ]; then
             echo "::error::expected mod-cache-match=partial for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
+          fi
+          exit "$fail"
+
+      # The program is never run: cache-go only checks whether one is set, and
+      # skips the build cache without touching it.
+      - name: "Restore with GOCACHEPROG set"
+        id: "restore-external"
+        uses: "./cache-go/restore"
+        env:
+          GOCACHEPROG: "/usr/bin/false"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      - name: "Save with GOCACHEPROG set"
+        id: "save-external"
+        uses: "./cache-go/save"
+        env:
+          GOCACHEPROG: "/usr/bin/false"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      - name: "Assert GOCACHEPROG skips the build cache"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          BUILD_MATCH: "${{ steps.restore-external.outputs.build-cache-match }}"
+          BUILD_EXTERNAL: "${{ steps.restore-external.outputs.build-cache-external }}"
+          BUILD_SAVED: "${{ steps.save-external.outputs.build-cache-saved }}"
+        run: |
+          fail=0
+          if [ "$BUILD_MATCH" != "external" ]; then
+            echo "::error::expected build-cache-match=external with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_MATCH'"
+            fail=1
+          fi
+          if [ "$BUILD_EXTERNAL" != "true" ]; then
+            echo "::error::expected build-cache-external=true with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_EXTERNAL'"
+            fail=1
+          fi
+          if [ "$BUILD_SAVED" != "false" ]; then
+            echo "::error::expected build-cache-saved=false with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_SAVED'"
             fail=1
           fi
           exit "$fail"

@@ -52,17 +52,27 @@ outputs:
       || 'none' }}
   build-cache-match:
     description: |
-      How the build cache was matched: "partial" (a restore-key matched) or
-      "none" (no match at all).
+      How the build cache was matched: "partial" (a restore-key matched),
+      "none" (no match at all), or "external" (GOCACHEPROG owns the build
+      cache, so there was nothing to look up - see build-cache-external).
 
       There is deliberately no "exact" and no build-cache-hit: the build cache
       is keyed on a fingerprint of its own contents, which cannot be known
       before it is restored, so it is always matched through its restore-key.
     # Only cache-matched-key can tell a restore-key match from a total miss
-    # here, since cache-hit is never 'true' for a prefix-only lookup.
+    # here, since cache-hit is never 'true' for a prefix-only lookup. 'external'
+    # is checked first because the lookup is skipped in that case, which would
+    # otherwise be indistinguishable from a miss.
     value: >-
-      ${{ (steps.restore-build-s3.outputs.cache-matched-key || steps.restore-build-github.outputs.cache-matched-key) != '' && 'partial'
+      ${{ steps.go-cache.outputs.build-cache-external == 'true' && 'external'
+      || (steps.restore-build-s3.outputs.cache-matched-key || steps.restore-build-github.outputs.cache-matched-key) != '' && 'partial'
       || 'none' }}
+  build-cache-external:
+    description: |
+      "true" when GOCACHEPROG is set, meaning an external program implements
+      the build cache and the build cache directory is never written, so this
+      action neither restored nor will save it.
+    value: "${{ steps.go-cache.outputs.build-cache-external }}"
 
 runs:
   using: "composite"
@@ -136,7 +146,7 @@ runs:
     # recently saved build cache for this scope.
     - id: "restore-build-s3"
       name: "Restore go build cache (S3)"
-      if: "inputs.cache-backend == 's3'"
+      if: "inputs.cache-backend == 's3' && steps.go-cache.outputs.build-cache-external != 'true'"
       uses: "tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9" # v1.10.2
       with:
         endpoint: ${{ fromJson(inputs.s3-credentials).endpoint }}
@@ -152,7 +162,7 @@ runs:
 
     - id: "restore-build-github"
       name: "Restore go build cache (GitHub)"
-      if: "inputs.cache-backend == 'github'"
+      if: "inputs.cache-backend == 'github' && steps.go-cache.outputs.build-cache-external != 'true'"
       uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
       with:
         key: "${{ steps.go-cache.outputs.build-restore-key }}"

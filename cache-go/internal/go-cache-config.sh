@@ -43,6 +43,20 @@ go_version="$(go env GOVERSION | sed 's/^go//')"
 mod_cache="$(go env GOMODCACHE)"
 build_cache="$(go env GOCACHE)"
 
+# GOCACHEPROG names a program that implements the build cache externally. The
+# go command then hands every lookup and store to it over stdin/stdout, and
+# never touches the build cache directory, which stays empty however much is
+# compiled. Blacksmith's runners set one, so that the build cache lives on
+# their servers rather than the runner's disk.
+#
+# Restoring and saving that empty directory moves nothing and tells the caller
+# nothing, so both are skipped when a program owns the cache.
+if [ -n "$(go env GOCACHEPROG)" ]; then
+  build_cache_external="true"
+else
+  build_cache_external="false"
+fi
+
 repo="${GITHUB_REPOSITORY//\//-}"
 scope="${go_version}-${CACHE_NAME}-at-${repo}-on-${RUNNER_OS}-${RUNNER_ARCH}"
 
@@ -50,6 +64,7 @@ scope="${go_version}-${CACHE_NAME}-at-${repo}-on-${RUNNER_OS}-${RUNNER_ARCH}"
   echo "go_version=${go_version}"
   echo "mod_cache=${mod_cache}"
   echo "build_cache=${build_cache}"
+  echo "build-cache-external=${build_cache_external}"
   echo "mod-key=go-mod-${scope}-${DEP_HASH}"
   echo "mod-restore-key=go-mod-${scope}-"
   echo "build-restore-key=go-build-${scope}-"

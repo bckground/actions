@@ -35,7 +35,7 @@ outputs:
     description: |
       "true" when the build cache was handed to the backend, "false" when the
       upload was skipped because the cache had not changed since
-      cache-go/restore ran.
+      cache-go/restore ran, or because GOCACHEPROG owns the build cache.
     value: "${{ steps.plan.outputs.save-build }}"
 
 runs:
@@ -90,8 +90,12 @@ runs:
       env:
         MOD_KEY: "${{ steps.go-cache.outputs.mod-key }}"
         BUILD_HASH: "${{ steps.build-hash.outputs.hash }}"
+        BUILD_CACHE_EXTERNAL: "${{ steps.go-cache.outputs.build-cache-external }}"
       run: |
-        if [ "$BUILD_HASH" = "${CACHE_GO_BUILD_HASH:-}" ]; then
+        if [ "$BUILD_CACHE_EXTERNAL" = "true" ]; then
+          save_build="false"
+          echo "GOCACHEPROG owns the build cache; skipping its upload"
+        elif [ "$BUILD_HASH" = "${CACHE_GO_BUILD_HASH:-}" ]; then
           save_build="false"
           echo "build cache unchanged since restore; skipping its upload"
         else
