@@ -20,7 +20,7 @@ inputs:
       - bucket_name
     default: ""
   name:
-    default: "default"
+    description: "Name that scopes the cache keys (defaults to the id of the calling job)"
   dependency-path:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
@@ -101,7 +101,7 @@ runs:
       id: "go-cache"
       shell: "bash"
       env:
-        CACHE_NAME: "${{ inputs.name }}"
+        CACHE_NAME: "${{ inputs.name == '' && github.job || inputs.name }}"
         DEP_HASH: "${{ hashFiles(inputs.dependency-path == '' && 'go.sum' || inputs.dependency-path) }}"
       run: |
         bash "${{ github.action_path }}/../internal/go-cache-config.sh"
