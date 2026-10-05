@@ -25,7 +25,7 @@ inputs:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
 outputs:
-  mod-cache-hit:
+  exact-mod-cache-hit:
     description: |
       "true" only when the module cache's primary key was an exact match;
       "false" for a restore-key match or a total miss. See mod-cache-match to
@@ -36,6 +36,19 @@ outputs:
     # The parentheses are required: '==' binds tighter than '||', so without
     # them the comparison would only apply to the github output.
     value: ${{ (steps.restore-mod-s3.outputs.cache-hit || steps.restore-mod-github.outputs.cache-hit) == 'true' }}
+  exact-build-cache-hit:
+    description: |
+      Always "false". The build cache is keyed on a fingerprint of its own
+      contents, which cannot be known before it is restored, so it is looked up
+      through its restore-key and its primary key can never match a saved one.
+
+      Present only so that a caller reading exact-mod-cache-hit finds the
+      build cache's counterpart where it expects it. Use build-cache-match to
+      tell a restore-key match from a total miss.
+    # A constant rather than the backend's cache-hit: tespkg/actions-cache
+    # reports a hit whenever the matched key starts with the looked-up key,
+    # and the build cache's looked-up key is its restore-key prefix.
+    value: "false"
   mod-cache-match:
     description: |
       How the module cache was matched: "exact" (primary key hit), "partial"
@@ -56,9 +69,10 @@ outputs:
       "none" (no match at all), or "external" (GOCACHEPROG owns the build
       cache, so there was nothing to look up - see build-cache-external).
 
-      There is deliberately no "exact" and no build-cache-hit: the build cache
-      is keyed on a fingerprint of its own contents, which cannot be known
-      before it is restored, so it is always matched through its restore-key.
+      There is deliberately no "exact": the build cache is keyed on a
+      fingerprint of its own contents, which cannot be known before it is
+      restored, so it is always matched through its restore-key. That is also
+      why exact-build-cache-hit is always "false".
     # Only cache-matched-key can tell a restore-key match from a total miss
     # here, since cache-hit is never 'true' for a prefix-only lookup. 'external'
     # is checked first because the lookup is skipped in that case, which would

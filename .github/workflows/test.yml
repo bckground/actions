@@ -201,17 +201,22 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore.outputs.mod-cache-match }}"
+          BUILD_HIT: "${{ steps.restore.outputs.exact-build-cache-hit }}"
           BUILD_MATCH: "${{ steps.restore.outputs.build-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "true" ]; then
-            echo "::error::expected mod-cache-hit=true for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=true for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "exact" ]; then
             echo "::error::expected mod-cache-match=exact for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
+          fi
+          if [ "$BUILD_HIT" != "false" ]; then
+            echo "::error::expected exact-build-cache-hit=false for backend '$BACKEND', got '$BUILD_HIT'"
             fail=1
           fi
           if [ "$BUILD_MATCH" != "partial" ]; then
@@ -358,13 +363,13 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore-miss.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore-miss.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore-miss.outputs.mod-cache-match }}"
           BUILD_MATCH: "${{ steps.restore-miss.outputs.build-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "false" ]; then
-            echo "::error::expected mod-cache-hit=false on a miss for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=false on a miss for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "none" ]; then
@@ -392,12 +397,12 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore-partial.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore-partial.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore-partial.outputs.mod-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "false" ]; then
-            echo "::error::expected mod-cache-hit=false on a partial match for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=false on a partial match for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "partial" ]; then
