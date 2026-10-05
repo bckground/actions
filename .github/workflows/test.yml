@@ -57,12 +57,22 @@ jobs:
         with:
           cache-backend: "none"
 
+      - name: "cache-go rejects name combined with mod-cache-name"
+        id: "cachego-names"
+        continue-on-error: true
+        uses: "./cache-go/restore"
+        with:
+          cache-backend: "github"
+          name: "both"
+          mod-cache-name: "mod"
+
       - name: "Assert guard behavior"
         shell: "bash"
         env:
           INVALID_BACKEND_OUTCOME: "${{ steps.invalid-backend.outcome }}"
           S3_NO_CREDENTIALS_OUTCOME: "${{ steps.s3-no-credentials.outcome }}"
           CACHEGO_NONE_OUTCOME: "${{ steps.cachego-none.outcome }}"
+          CACHEGO_NAMES_OUTCOME: "${{ steps.cachego-names.outcome }}"
         run: |
           fail=0
           if [ "$INVALID_BACKEND_OUTCOME" != "failure" ]; then
@@ -75,6 +85,10 @@ jobs:
           fi
           if [ "$CACHEGO_NONE_OUTCOME" != "failure" ]; then
             echo "::error::cache-go should reject cache-backend 'none' (got '$CACHEGO_NONE_OUTCOME')"
+            fail=1
+          fi
+          if [ "$CACHEGO_NAMES_OUTCOME" != "failure" ]; then
+            echo "::error::cache-go should reject name combined with mod-cache-name (got '$CACHEGO_NAMES_OUTCOME')"
             fail=1
           fi
           exit "$fail"
