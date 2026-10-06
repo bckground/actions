@@ -20,7 +20,11 @@ inputs:
       - bucket_name
     default: ""
   name:
-    default: "default"
+    description: "Name that scopes both cache keys (defaults to the id of the calling job). Cannot be combined with mod-cache-name or build-cache-name"
+  mod-cache-name:
+    description: "Name that scopes the module cache key alone (defaults to the id of the calling job)"
+  build-cache-name:
+    description: "Name that scopes the build cache key alone (defaults to the id of the calling job)"
   dependency-path:
     description: "Path to the dependency file to hash for the cache key (defaults to go.sum at the workspace root)"
 
@@ -35,7 +39,7 @@ outputs:
     description: |
       "true" when the build cache was handed to the backend, "false" when the
       upload was skipped because the cache had not changed since
-      cache-go/restore ran.
+      cache-go/restore ran, or because GOCACHEPROG owns the build cache.
     value: "${{ steps.plan.outputs.save-build }}"
 
 runs:
@@ -75,6 +79,9 @@ runs:
       shell: "bash"
       env:
         CACHE_NAME: "${{ inputs.name }}"
+        MOD_CACHE_NAME: "${{ inputs.mod-cache-name }}"
+        BUILD_CACHE_NAME: "${{ inputs.build-cache-name }}"
+        DEFAULT_CACHE_NAME: "${{ github.job }}"
         DEP_HASH: "${{ hashFiles(inputs.dependency-path == '' && 'go.sum' || inputs.dependency-path) }}"
         BUILD_HASH: "${{ steps.build-hash.outputs.hash }}"
       run: |
@@ -90,8 +97,12 @@ runs:
       env:
         MOD_KEY: "${{ steps.go-cache.outputs.mod-key }}"
         BUILD_HASH: "${{ steps.build-hash.outputs.hash }}"
+        BUILD_CACHE_EXTERNAL: "${{ steps.go-cache.outputs.build-cache-external }}"
       run: |
-        if [ "$BUILD_HASH" = "${CACHE_GO_BUILD_HASH:-}" ]; then
+        if [ "$BUILD_CACHE_EXTERNAL" = "true" ]; then
+          save_build="false"
+          echo "GOCACHEPROG owns the build cache; skipping its upload"
+        elif [ "$BUILD_HASH" = "${CACHE_GO_BUILD_HASH:-}" ]; then
           save_build="false"
           echo "build cache unchanged since restore; skipping its upload"
         else
