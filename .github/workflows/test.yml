@@ -471,3 +471,129 @@ jobs:
             fail=1
           fi
           exit "$fail"
+
+  cache-directory:
+    name: "cache-directory"
+    runs-on: "blacksmith-2vcpu-ubuntu-2404-arm"
+    env:
+      # restore takes the newest cache for its scope, so a name shared across
+      # runs could restore another run's directory.
+      CACHE_NAME: "ci-cache-directory-${{ github.run_id }}-${{ github.run_attempt }}"
+    steps:
+      - uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+
+      - name: "Populate the directory"
+        run: |
+          echo "CACHE_DIR=${RUNNER_TEMP}/cache-directory-test" | tee -a "$GITHUB_ENV"
+          CACHE_DIR="${RUNNER_TEMP}/cache-directory-test"
+          mkdir -p "$CACHE_DIR/nested dir"
+          echo "one" > "$CACHE_DIR/a.txt"
+          echo "two" > "$CACHE_DIR/nested dir/b.txt"
+
+      - name: "Save the directory"
+        id: "save-first"
+        uses: "./cache-directory/save"
+        with:
+          path: "${{ env.CACHE_DIR }}"
+          name: "${{ env.CACHE_NAME }}"
+
+      - name: "Remove the directory"
+        run: |
+          rm -rf "$CACHE_DIR"
+
+      - name: "Restore the directory"
+        id: "restore"
+        uses: "./cache-directory/restore"
+        with:
+          path: "${{ env.CACHE_DIR }}"
+          name: "${{ env.CACHE_NAME }}"
+
+      - name: "Save the unchanged directory"
+        id: "save-unchanged"
+        uses: "./cache-directory/save"
+        with:
+          path: "${{ env.CACHE_DIR }}"
+          name: "${{ env.CACHE_NAME }}"
+
+      # Without the "hash" input there is no primary key, so the restore can
+      # only be "partial".
+      - name: "Assert the round-trip"
+        shell: "bash"
+        env:
+          SAVED_FIRST: "${{ steps.save-first.outputs.cache-saved }}"
+          MATCH: "${{ steps.restore.outputs.cache-match }}"
+          SAVED_UNCHANGED: "${{ steps.save-unchanged.outputs.cache-saved }}"
+        run: |
+          fail=0
+          if [ "$SAVED_FIRST" != "true" ]; then
+            echo "::error::expected cache-saved=true on the first save, got '$SAVED_FIRST'"
+            fail=1
+          fi
+          if [ "$MATCH" != "partial" ]; then
+            echo "::error::expected cache-match=partial, got '$MATCH'"
+            fail=1
+          fi
+          if [ "$(cat "$CACHE_DIR/a.txt")" != "one" ] || [ "$(cat "$CACHE_DIR/nested dir/b.txt")" != "two" ]; then
+            echo "::error::restored directory contents differ from what was saved"
+            fail=1
+          fi
+          if [ "$SAVED_UNCHANGED" != "false" ]; then
+            echo "::error::expected cache-saved=false for an unchanged directory, got '$SAVED_UNCHANGED'"
+            fail=1
+          fi
+          exit "$fail"
+
+      - name: "Extract the saved fingerprint"
+        id: "fingerprint"
+        env:
+          MATCHED_KEY: "${{ steps.restore.outputs.cache-matched-key }}"
+        run: |
+          echo "hash=${MATCHED_KEY##*-}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: "Restore the directory by fingerprint"
+        id: "restore-exact"
+        uses: "./cache-directory/restore"
+        with:
+          path: "${{ env.CACHE_DIR }}"
+          name: "${{ env.CACHE_NAME }}"
+          hash: "${{ steps.fingerprint.outputs.hash }}"
+
+      - name: "Change the directory"
+        run: |
+          echo "three" > "$CACHE_DIR/a.txt"
+
+      - name: "Save the changed directory"
+        id: "save-changed"
+        uses: "./cache-directory/save"
+        with:
+          path: "${{ env.CACHE_DIR }}"
+          name: "${{ env.CACHE_NAME }}"
+
+      - name: "Save a missing directory"
+        id: "save-missing"
+        uses: "./cache-directory/save"
+        with:
+          path: "${{ env.CACHE_DIR }}-missing"
+          name: "${{ env.CACHE_NAME }}-missing"
+
+      - name: "Assert exact match and change detection"
+        shell: "bash"
+        env:
+          MATCH: "${{ steps.restore-exact.outputs.cache-match }}"
+          SAVED_CHANGED: "${{ steps.save-changed.outputs.cache-saved }}"
+          SAVED_MISSING: "${{ steps.save-missing.outputs.cache-saved }}"
+        run: |
+          fail=0
+          if [ "$MATCH" != "exact" ]; then
+            echo "::error::expected cache-match=exact with the hash input, got '$MATCH'"
+            fail=1
+          fi
+          if [ "$SAVED_CHANGED" != "true" ]; then
+            echo "::error::expected cache-saved=true for a changed directory, got '$SAVED_CHANGED'"
+            fail=1
+          fi
+          if [ "$SAVED_MISSING" != "false" ]; then
+            echo "::error::expected cache-saved=false for a missing directory, got '$SAVED_MISSING'"
+            fail=1
+          fi
+          exit "$fail"
