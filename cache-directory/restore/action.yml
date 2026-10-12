@@ -1,0 +1,87 @@
+---
+name: "cache-directory - restore"
+description: "Restores a directory from the GitHub Actions cache."
+
+inputs:
+  path:
+    description: "Directory to restore (a leading ~ is expanded)"
+    required: true
+  name:
+    description: "Name that scopes the cache keys (defaults to the id of the calling job)"
+  hash:
+    description: |
+      The fingerprint the restored directory is expected to have, as
+      cache-directory/save computed it - the trailing component of a
+      cache-matched-key from an earlier run, say.
+
+      Supply it only when it is known independently of the directory, which is
+      the sole way an exact match can be reported: the fingerprint is otherwise
+      unknowable until the directory has been restored. Left empty, the lookup
+      falls through to the restore-key and cache-match is never "exact".
+
+outputs:
+  cache-match:
+    description: |
+      How the directory was matched: "exact" (the "hash" input named a cached
+      fingerprint), "partial" (only a restore-key matched), or "none" (no match
+      at all).
+
+      Without the "hash" input there is no primary key to look up, so "exact"
+      cannot occur.
+    # 'exact' when cache-hit is 'true'. Otherwise 'partial' if a cache was
+    # restored at all and 'none' if not: cache-matched-key holds the restored
+    # cache's key and is empty only on a total miss, so it splits 'partial'
+    # from 'none' without relying on whether cache-hit is '' or 'false' on a
+    # miss.
+    value: >-
+      ${{ steps.restore.outputs.cache-hit == 'true' && 'exact'
+      || steps.restore.outputs.cache-matched-key != '' && 'partial'
+      || 'none' }}
+  cache-matched-key:
+    description: |
+      Key of the cache that was restored, empty on a total miss. Its trailing
+      component is the fingerprint of the directory as it was saved, which is
+      what the "hash" input of a later run takes.
+    value: "${{ steps.restore.outputs.cache-matched-key }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Resolve cache configuration"
+      id: "config"
+      shell: "bash"
+      env:
+        CACHE_NAME: "${{ inputs.name == '' && github.job || inputs.name }}"
+        CACHE_DIRECTORY: "${{ inputs.path }}"
+        DIR_HASH: "${{ inputs.hash }}"
+      run: |
+        bash "${{ github.action_path }}/../internal/cache-config.sh"
+
+    # Without the "hash" input the directory is keyed on a fingerprint of its
+    # own contents, which is unknowable until it has been restored, so there is
+    # no primary key and cache-config.sh emits none. Falling back to
+    # restore-key as the key is deliberate: saved keys are always
+    # prefix+fingerprint, so the prefix alone can never match one, and the
+    # lookup falls through to the restore-key - which returns the most recently
+    # saved cache for this scope.
+    - id: "restore"
+      name: "Restore directory"
+      uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+      with:
+        key: "${{ steps.config.outputs.key || steps.config.outputs.restore-key }}"
+        restore-keys: |
+          ${{ steps.config.outputs.restore-key }}
+        path: |
+          ${{ steps.config.outputs.directory }}
+
+    # Hand cache-directory/save what it needs to skip an upload that would
+    # store nothing. The variable is named after the cache, so a job may run
+    # this action once per directory it caches.
+    - name: "Record what cache-directory/save can skip"
+      shell: "bash"
+      env:
+        CACHE_DIRECTORY: "${{ inputs.path }}"
+        HASH_ENV_VAR: "${{ steps.config.outputs.hash-env-var }}"
+      run: |
+        hash="$(bash "${{ github.action_path }}/../internal/directory-hash.sh")"
+        echo "${HASH_ENV_VAR}=${hash}" | tee -a "$GITHUB_ENV"

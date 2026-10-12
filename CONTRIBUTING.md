@@ -15,6 +15,11 @@ The repository follows GitHub Actions composite action patterns:
   - `save/` - Saves the Go module and build caches, skipping either upload when it would store nothing: the build cache when its fingerprint is unchanged since `restore` ran, the module cache when `restore` matched its key exactly. Neither backend reports whether it actually stored anything, so this is decided here rather than left to them. It makes `cache-go` a once-per-job action, which it must be anyway since a runner has a single build cache directory
   - `internal/go-cache-config.sh` - Shared script that resolves the Go configuration and emits every cache key, so no key is ever assembled in an `action.yml`. `restore` and `save` invoke it via `github.action_path`, so both run it at the same ref. It emits `build-key` only when given a `BUILD_HASH`, which only `save` has
   - `internal/go-build-cache-hash.sh` - Shared script that fingerprints the build cache, invoked the same way. It hashes the sorted list of output file (`-d`) names: each output is named after the hash of its own contents, so the list describes exactly what the cache holds. The `-a` index records are deliberately left out, since some of their keys embed source file mtimes, which a CI checkout rewrites on every run - hashing them re-uploaded caches whose contents had not changed. It takes no input and resolves `GOCACHE` itself, so `save` can run it before `go-cache-config.sh`, which needs its output to build `build-key`
+- **`cache-directory/`** - Caches an arbitrary directory through the GitHub-native cache, for directories with no input that determines their contents (e.g. golangci-lint's cache). It is keyed on a fingerprint of the directory's contents, so it is matched through its restore-key unless the caller passes that fingerprint as the `hash` input:
+  - `restore/` - Restores the directory, and records its fingerprint in `$GITHUB_ENV` under a variable named after the cache, so a job can cache several directories under distinct names
+  - `save/` - Saves the directory, skipping the upload when its fingerprint is unchanged since `restore` ran or when the directory does not exist
+  - `internal/cache-config.sh` - Shared script that emits every cache key, invoked via `github.action_path` like `cache-go`'s
+  - `internal/directory-hash.sh` - Shared script that fingerprints the directory from its file paths and contents, ignoring metadata
 - Each action directory contains:
   - `action.yml` - Action definition with inputs, outputs, and steps
   - Composite actions that wrap external actions with organization-specific defaults
@@ -40,7 +45,7 @@ Formats all YAML, Markdown, and JSON files. prettier is provided through `mise` 
 
 ```bash
 actionlint
-shellcheck cache-go/internal/*.sh
+shellcheck cache-go/internal/*.sh cache-directory/internal/*.sh
 ```
 
 `actionlint` lints the workflow files (and runs `shellcheck` on their inline scripts); `shellcheck` lints the standalone helper scripts. Both tools are provided through `mise`. The same checks run in CI through the `lint` workflow.
@@ -49,7 +54,7 @@ shellcheck cache-go/internal/*.sh
 
 Beyond the linting and formatting above, behavior is validated through:
 
-1. The `test` workflow, which exercises the validation guard, `setup-mise`, and the `cache-go` save/restore round-trip - including that neither cache is re-uploaded when it would store nothing (even after a rebuild where only file mtimes changed), that a source change re-saves only the build cache, and that a set `GOCACHEPROG` skips the build cache - across the `github` and `s3` backends (the `s3` jobs run only when their secrets are available). It uses a minimal Go module fixture under `_test/fixtures/go`.
+1. The `test` workflow, which exercises the validation guard, `setup-mise`, and the `cache-go` save/restore round-trip - including that neither cache is re-uploaded when it would store nothing (even after a rebuild where only file mtimes changed), that a source change re-saves only the build cache, and that a set `GOCACHEPROG` skips the build cache - across the `github` and `s3` backends (the `s3` jobs run only when their secrets are available). It uses a minimal Go module fixture under `_test/fixtures/go`. It also round-trips `cache-directory`: an unchanged directory is not re-uploaded, a changed one is, a missing one never is, and the `hash` input yields an exact match.
 2. Using the actions in other repositories
 
 ## Action Usage Patterns
