@@ -57,12 +57,22 @@ jobs:
         with:
           cache-backend: "none"
 
+      - name: "cache-go rejects name combined with mod-cache-name"
+        id: "cachego-names"
+        continue-on-error: true
+        uses: "./cache-go/restore"
+        with:
+          cache-backend: "github"
+          name: "both"
+          mod-cache-name: "mod"
+
       - name: "Assert guard behavior"
         shell: "bash"
         env:
           INVALID_BACKEND_OUTCOME: "${{ steps.invalid-backend.outcome }}"
           S3_NO_CREDENTIALS_OUTCOME: "${{ steps.s3-no-credentials.outcome }}"
           CACHEGO_NONE_OUTCOME: "${{ steps.cachego-none.outcome }}"
+          CACHEGO_NAMES_OUTCOME: "${{ steps.cachego-names.outcome }}"
         run: |
           fail=0
           if [ "$INVALID_BACKEND_OUTCOME" != "failure" ]; then
@@ -75,6 +85,10 @@ jobs:
           fi
           if [ "$CACHEGO_NONE_OUTCOME" != "failure" ]; then
             echo "::error::cache-go should reject cache-backend 'none' (got '$CACHEGO_NONE_OUTCOME')"
+            fail=1
+          fi
+          if [ "$CACHEGO_NAMES_OUTCOME" != "failure" ]; then
+            echo "::error::cache-go should reject name combined with mod-cache-name (got '$CACHEGO_NAMES_OUTCOME')"
             fail=1
           fi
           exit "$fail"
@@ -116,6 +130,10 @@ jobs:
       S3_CREDENTIALS: >-
         ${{ format('{{"endpoint": "{0}", "access_key": "{1}", "secret_key": "{2}", "bucket_name": "{3}"}}',
         secrets.OVH_GHA_CACHE_ENDPOINT, vars.OVH_GHA_CACHE_USER_SECRET_ID, secrets.OVH_GHA_CACHE_USER_SECRET, secrets.OVH_GHA_CACHE_BUCKET_NAME) }}
+      # Blacksmith runners set GOCACHEPROG, which moves the build cache off
+      # disk and makes cache-go skip it. Clearing it lets the steps below
+      # exercise the build cache; the GOCACHEPROG path is tested at the end.
+      GOCACHEPROG: ""
     steps:
       - uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
 
@@ -123,6 +141,15 @@ jobs:
         with:
           go-version: "1.26"
           cache: false
+
+      # Guards the job-level override: an empty variable does not override a
+      # value in the go env file.
+      - name: "Assert GOCACHEPROG is disabled"
+        run: |
+          if [ -n "$(go env GOCACHEPROG)" ]; then
+            echo "::error::GOCACHEPROG is still set to '$(go env GOCACHEPROG)'"
+            exit 1
+          fi
 
       # The touch backdates the sources past Go's modTimeCutoff (2s): Go
       # refuses to index a directory containing a file modified that recently,
@@ -188,17 +215,22 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore.outputs.mod-cache-match }}"
+          BUILD_HIT: "${{ steps.restore.outputs.exact-build-cache-hit }}"
           BUILD_MATCH: "${{ steps.restore.outputs.build-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "true" ]; then
-            echo "::error::expected mod-cache-hit=true for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=true for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "exact" ]; then
             echo "::error::expected mod-cache-match=exact for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
+          fi
+          if [ "$BUILD_HIT" != "false" ]; then
+            echo "::error::expected exact-build-cache-hit=false for backend '$BACKEND', got '$BUILD_HIT'"
             fail=1
           fi
           if [ "$BUILD_MATCH" != "partial" ]; then
@@ -345,13 +377,13 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore-miss.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore-miss.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore-miss.outputs.mod-cache-match }}"
           BUILD_MATCH: "${{ steps.restore-miss.outputs.build-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "false" ]; then
-            echo "::error::expected mod-cache-hit=false on a miss for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=false on a miss for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "none" ]; then
@@ -379,16 +411,63 @@ jobs:
         shell: "bash"
         env:
           BACKEND: "${{ matrix.backend }}"
-          MOD_HIT: "${{ steps.restore-partial.outputs.mod-cache-hit }}"
+          MOD_HIT: "${{ steps.restore-partial.outputs.exact-mod-cache-hit }}"
           MOD_MATCH: "${{ steps.restore-partial.outputs.mod-cache-match }}"
         run: |
           fail=0
           if [ "$MOD_HIT" != "false" ]; then
-            echo "::error::expected mod-cache-hit=false on a partial match for backend '$BACKEND', got '$MOD_HIT'"
+            echo "::error::expected exact-mod-cache-hit=false on a partial match for backend '$BACKEND', got '$MOD_HIT'"
             fail=1
           fi
           if [ "$MOD_MATCH" != "partial" ]; then
             echo "::error::expected mod-cache-match=partial for backend '$BACKEND', got '$MOD_MATCH'"
+            fail=1
+          fi
+          exit "$fail"
+
+      # The program is never run: cache-go only checks whether one is set, and
+      # skips the build cache without touching it.
+      - name: "Restore with GOCACHEPROG set"
+        id: "restore-external"
+        uses: "./cache-go/restore"
+        env:
+          GOCACHEPROG: "/usr/bin/false"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      - name: "Save with GOCACHEPROG set"
+        id: "save-external"
+        uses: "./cache-go/save"
+        env:
+          GOCACHEPROG: "/usr/bin/false"
+        with:
+          cache-backend: "${{ matrix.backend }}"
+          s3-credentials: "${{ matrix.backend == 's3' && env.S3_CREDENTIALS || '' }}"
+          name: "ci-cache-go-test"
+          dependency-path: "_test/fixtures/go/go.sum"
+
+      - name: "Assert GOCACHEPROG skips the build cache"
+        shell: "bash"
+        env:
+          BACKEND: "${{ matrix.backend }}"
+          BUILD_MATCH: "${{ steps.restore-external.outputs.build-cache-match }}"
+          BUILD_EXTERNAL: "${{ steps.restore-external.outputs.build-cache-external }}"
+          BUILD_SAVED: "${{ steps.save-external.outputs.build-cache-saved }}"
+        run: |
+          fail=0
+          if [ "$BUILD_MATCH" != "external" ]; then
+            echo "::error::expected build-cache-match=external with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_MATCH'"
+            fail=1
+          fi
+          if [ "$BUILD_EXTERNAL" != "true" ]; then
+            echo "::error::expected build-cache-external=true with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_EXTERNAL'"
+            fail=1
+          fi
+          if [ "$BUILD_SAVED" != "false" ]; then
+            echo "::error::expected build-cache-saved=false with GOCACHEPROG set on backend '$BACKEND', got '$BUILD_SAVED'"
             fail=1
           fi
           exit "$fail"
