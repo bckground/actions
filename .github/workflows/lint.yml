@@ -15,7 +15,7 @@ jobs:
 
       # Use mise-action directly (not our setup-mise) so linting still runs even
       # when the repository's own composite actions are broken.
-      - uses: "jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7" # v5.2.0
+      - uses: "jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195" # v5.2.5
         with:
           install: true
           cache: false
